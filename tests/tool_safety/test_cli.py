@@ -92,6 +92,24 @@ def test_manifest_writes_output(tmp_path):
     assert output.exists()
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert len(payload) == 14
+    for item in payload:
+        report = item["report"]
+        assert {
+            "decision",
+            "risk_level",
+            "rule_ids",
+            "findings",
+            "recommendation",
+        } <= report.keys()
+        if report["decision"] != "allow":
+            assert report["findings"]
+        for finding in report["findings"]:
+            assert {
+                "category",
+                "rule_id",
+                "evidence",
+                "recommendation",
+            } <= finding.keys()
     # Audit file has one line per sample.
     lines = [ln for ln in audit.read_text(encoding="utf-8").splitlines()
              if ln.strip()]

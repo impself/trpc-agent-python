@@ -345,13 +345,17 @@ python -m pytest tests/tool_safety/ -v
 ## 文件布局
 
 ```text
-tool/
-  safety/                       # Guard、策略、规则、扫描器、审计和 Telemetry
+trpc_agent_sdk/tools/safety/    # Guard、策略、规则、扫描器、审计和 Telemetry
   wrapper.py                    # SafetyWrappedCallable、SafetyCheckedExecutor
+  examples/
+    tool_safety_policy.yaml     # 示例策略
+    samples/                    # 14 个公开样例及 manifest
+    tool_safety_report.json     # 单次扫描完整报告
+    tool_safety_audit.jsonl     # JSONL 审计日志
+    manifest_run.json           # 14 份完整报告及预期结果核对
 scripts/
   tool_safety_check.py          # CLI
 tests/tool_safety/              # 安全检查器测试
-trpc_agent_sdk/tools/safety/examples/           # 策略、14 个样例、报告和审计样例
 docs/
   tool_safety_guard.md          # English version
   tool_safety_guard.zh_CN.md    # 本文

@@ -168,6 +168,7 @@ def _run_manifest(guard: ToolSafetyGuard,
             "risk_level": report.risk_level.label(),
             "duration_ms": report.scan_duration_ms,
             "matches_expected": _decision_matches(report, expected),
+            "report": report.model_dump(mode="json"),
         })
         blocked = report.decision != SafetyDecision.ALLOW
         asyncio.run(_emit_audit(

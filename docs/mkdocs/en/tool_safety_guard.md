@@ -393,7 +393,7 @@ tool/
     _telemetry.py               # OTel span attrs + metrics (no-op safe)
     _tool_adapter.py            # ToolInputAdapter + built-ins
     _filter.py                  # ToolScriptSafetyFilter (terminal)
-  wrapper.py                    # SafetyWrappedCallable, SafetyCheckedExecutor
+    wrapper.py                  # SafetyWrappedCallable, SafetyCheckedExecutor
 scripts/
   tool_safety_check.py          # CLI
 tests/tool_safety/              # safety guard tests
@@ -402,7 +402,7 @@ trpc_agent_sdk/tools/safety/examples/
   samples/                      # 14 public samples + manifest
   tool_safety_report.json       # generated report
   tool_safety_audit.jsonl       # generated audit log
-  manifest_run.json             # manifest execution summary
+  manifest_run.json             # 14 full reports plus expectation checks
 docs/
   tool_safety_guard.md          # this document
   tool_safety_guard.zh_CN.md    # Chinese version
