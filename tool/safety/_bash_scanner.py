@@ -447,6 +447,27 @@ class _BashScanner:
             ))
             return
 
+        # These constructs make a second program or command stream execute
+        # outside the script currently being scanned. Do not claim that the
+        # outer command is safe merely because its executable is allowlisted.
+        if exec_lower in {"source", "."}:
+            self.dynamic_execs.append(DynamicExecFact(
+                snippet=snippet, loc=loc, kind="source-file",
+            ))
+            return
+        if exec_lower == "xargs":
+            self.dynamic_execs.append(DynamicExecFact(
+                snippet=snippet, loc=loc, kind="xargs-command-stream",
+            ))
+            return
+        if exec_lower == "find" and any(
+                arg in {"-exec", "-execdir", "-ok", "-okdir"}
+                for arg in argv):
+            self.dynamic_execs.append(DynamicExecFact(
+                snippet=snippet, loc=loc, kind="find-exec",
+            ))
+            return
+
         # eval / bash -c / sh -c
         if exec_lower == "eval":
             self.dynamic_execs.append(DynamicExecFact(
@@ -463,6 +484,28 @@ class _BashScanner:
                     loc=loc,
                     operator=f"{exec_lower} -c",
                 ))
+            return
+        if _is_python_pip_install(exec_lower, argv):
+            self.dependency_installs.append(DependencyInstallFact(
+                snippet=snippet,
+                loc=loc,
+                manager=argv[1],
+                command=" ".join([executable] + argv),
+            ))
+            self.process_calls.append(ProcessFact(
+                snippet=snippet,
+                loc=loc,
+                command=executable,
+                shell=None,
+                has_operators=preceding_op in ("|", "&", "&&", "||"),
+            ))
+            return
+        if exec_lower in _INTERPRETERS and _interpreter_runs_payload(argv):
+            self.dynamic_execs.append(DynamicExecFact(
+                snippet=snippet,
+                loc=loc,
+                kind=f"{exec_lower}-payload",
+            ))
             return
 
         # sleep
@@ -661,6 +704,30 @@ def _parse_sleep(raw: str) -> float | None:
     if len(raw) >= 2 and raw[-1].lower() in mult and raw[:-1].isdigit():
         return float(raw[:-1]) * mult[raw[-1].lower()]
     return None
+
+
+def _is_python_pip_install(executable: str, argv: list[str]) -> bool:
+    if executable not in {"python", "python2", "python3"}:
+        return False
+    try:
+        module_index = argv.index("-m")
+    except ValueError:
+        return False
+    return module_index + 2 < len(argv) \
+        and argv[module_index + 1] in {"pip", "pip3"} \
+        and argv[module_index + 2] == "install"
+
+
+def _interpreter_runs_payload(argv: list[str]) -> bool:
+    """Return whether an interpreter is being asked to run external code."""
+
+    for arg in argv:
+        if arg in {"-c", "-m"}:
+            return True
+        if arg.startswith("-"):
+            continue
+        return True
+    return False
 
 
 def _extract_dd_size(argv: list[str]) -> int | None:

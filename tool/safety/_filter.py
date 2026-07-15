@@ -1,11 +1,11 @@
 """Pre-execution safety filter.
 
-This filter demonstrates the seam where the guard plugs into the Tool /
-Skill execution pipeline. It is duck-typed to the framework's BaseFilter
-interface (``_before``/``_after``) so it can be composed with the
-existing filter runner without modifying SDK files, and it carries the
-``terminal_before_handler`` marker so a future framework opt-in can
-order it after ToolCallbackFilter.
+This adapter demonstrates the seam where the guard plugs into a Tool /
+Skill execution pipeline. Its ``_before``/``_after`` hooks mirror the
+framework filter shape, but it is deliberately standalone and is not a
+drop-in ``BaseFilter`` under the current SDK ordering rules. Use the wrapper
+for present-day enforcement; a future terminal phase can invoke this adapter
+after callback mutations have completed.
 
 For environments where direct framework wiring is not yet available, the
 :class:`ToolScriptSafetyFilter` also exposes a synchronous
@@ -17,12 +17,12 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import datetime as _dt
-from typing import Any, Awaitable, Callable, Mapping
+import logging
+from typing import Any, Coroutine, Mapping, TypeVar
 
 from tool.safety._audit import AuditSink, InMemoryAuditSink, NullAuditSink
 from tool.safety._exceptions import (
     SafetyAuditError,
-    SafetyGuardError,
     ToolRequestError,
 )
 from tool.safety._guard import ToolSafetyGuard
@@ -45,6 +45,8 @@ from tool.safety._tool_adapter import (
 # is the sanitized arguments to emit on the next ``trace_tool_call``.
 _trace_args_var: contextvars.ContextVar[tuple[str, ...] | None] = \
     contextvars.ContextVar("tool_safety_trace_args", default=None)
+_LOGGER = logging.getLogger(__name__)
+_ResultT = TypeVar("_ResultT")
 
 
 class BlockedExecutionError(Exception):
@@ -69,21 +71,17 @@ class ToolScriptSafetyFilter:
         flt = ToolScriptSafetyFilter(guard, audit_sink=JsonlAuditSink(...))
         decision, report = flt.check("workspace_exec", {"command": "ls"})
 
-    Usage (duck-typed to BaseFilter for future framework integration)::
-
-        # When the framework exposes the terminal ordering seam, just
-        # pass an instance of this filter in the filters list:
-        tool = WorkspaceExecTool(filters=[flt])
+    The ``_before``/``_after`` hooks are reserved for a future SDK terminal
+    phase. Do not add this object to today's ``filters=`` list: ordinary
+    callbacks can still mutate arguments after the configured filters run.
 
     The filter follows the plan's ``fail-closed`` posture: ``deny`` and
     un-approved ``needs_human_review`` block execution; audit failures
     block execution when ``policy.audit.required`` is true.
     """
 
-    # Marker for the future terminal-phase seam. The framework's
-    # FilterRunner will read this attribute to order the filter after
-    # ToolCallbackFilter. Defaults to True because the safety filter is
-    # always terminal.
+    # Metadata for the future terminal-phase seam. It has no effect until the
+    # framework explicitly implements terminal ordering.
     terminal_before_handler: bool = True
 
     def __init__(
@@ -104,7 +102,7 @@ class ToolScriptSafetyFilter:
         self._builtin = builtin_adapters or build_default_adapters(self.policy)
 
     # ------------------------------------------------------------------ #
-    # Synchronous API (used by wrapper)
+    # Decision-and-recording interface
     # ------------------------------------------------------------------ #
 
     def check(
@@ -121,20 +119,36 @@ class ToolScriptSafetyFilter:
         Callers that want fail-closed behavior should use ``enforce``.
         """
 
-        adapter = resolve_adapter(tool_name, self.policy,
-                                  builtin=self._builtin)
-        request = adapter.build_request(
-            args, metadata=metadata,
-        ) if _looks_like_args_dict(args) else _build_request_from_raw(
-            tool_name, tool_kind, args, adapter,
-        )
-        request = request.model_copy(update={"tool_kind": tool_kind}) \
-            if request.tool_kind == ToolKind.UNKNOWN else request
+        request = self._build_request(
+            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        return self._run_sync(self.check_request_async(request))
+
+    async def check_async(
+        self,
+        tool_name: str,
+        args: Mapping[str, Any],
+        *,
+        tool_kind: ToolKind = ToolKind.UNKNOWN,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> tuple[SafetyDecision, SafetyReport]:
+        """Async form of :meth:`check` that waits for required audit I/O."""
+        request = self._build_request(
+            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        return await self.check_request_async(request)
+
+    def check_request(
+        self, request: SafetyScanRequest,
+    ) -> tuple[SafetyDecision, SafetyReport]:
+        """Scan and record an already-normalized request synchronously."""
+        return self._run_sync(self.check_request_async(request))
+
+    async def check_request_async(
+        self, request: SafetyScanRequest,
+    ) -> tuple[SafetyDecision, SafetyReport]:
+        """Scan and durably record an already-normalized request."""
         report = self.guard.scan(request)
-        blocked = report.decision in (
-            SafetyDecision.DENY, SafetyDecision.NEEDS_HUMAN_REVIEW,
-        ) and self.policy.defaults.human_review_blocks_execution
-        self._after_scan(request, report, blocked=blocked)
+        blocked = self.blocks_execution(report)
+        await self.record_report_async(request, report, blocked=blocked)
         return report.decision, report
 
     def enforce(
@@ -152,9 +166,32 @@ class ToolScriptSafetyFilter:
         reached.
         """
 
-        decision, report = self.check(
-            tool_name, args, tool_kind=tool_kind, metadata=metadata,
-        )
+        request = self._build_request(
+            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        return self.enforce_request(request)
+
+    async def enforce_async(
+        self,
+        tool_name: str,
+        args: Mapping[str, Any],
+        *,
+        tool_kind: ToolKind = ToolKind.UNKNOWN,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> SafetyReport:
+        """Async form of :meth:`enforce` for async delegates."""
+        request = self._build_request(
+            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        return await self.enforce_request_async(request)
+
+    def enforce_request(self, request: SafetyScanRequest) -> SafetyReport:
+        """Fail closed unless the normalized request is allowed and audited."""
+        return self._run_sync(self.enforce_request_async(request))
+
+    async def enforce_request_async(
+        self, request: SafetyScanRequest,
+    ) -> SafetyReport:
+        """Async fail-closed form of :meth:`enforce_request`."""
+        decision, report = await self.check_request_async(request)
         if decision == SafetyDecision.ALLOW:
             return report
         if decision == SafetyDecision.NEEDS_HUMAN_REVIEW \
@@ -179,14 +216,18 @@ class ToolScriptSafetyFilter:
         args = _resolve_args(req)
         tool_kind = _resolve_tool_kind(ctx, req)
         try:
-            _, report = self.check(tool_name, args, tool_kind=tool_kind)
+            _, report = await self.check_async(
+                tool_name, args, tool_kind=tool_kind)
         except ToolRequestError as exc:
-            self._emit_guard_error(tool_name, exc)
+            request = SafetyScanRequest(
+                tool_name=tool_name,
+                tool_kind=tool_kind,
+                script="",
+            )
+            report = self.guard.error_report(request, exc)
+            await self.record_report_async(request, report, blocked=True)
             _set_filter_continue(rsp, False)
-            _set_filter_rsp(rsp, {
-                "error": "tool_request_error",
-                "message": str(exc),
-            })
+            _set_filter_rsp(rsp, _render_block(report))
             return
         if report.decision == SafetyDecision.ALLOW:
             _set_filter_continue(rsp, True)
@@ -209,20 +250,25 @@ class ToolScriptSafetyFilter:
     # Internals
     # ------------------------------------------------------------------ #
 
-    def _after_scan(
+    async def record_report_async(
         self,
         request: SafetyScanRequest,
         report: SafetyReport,
         *,
         blocked: bool,
     ) -> None:
-        # Telemetry first so attributes land on the active span even if
-        # audit write fails.
+        """Record telemetry and await the audit event before execution."""
+
+        # Telemetry is best effort; audit is the enforcement-critical side
+        # effect and therefore is awaited below.
         sink = self._telemetry or get_default_sink()
         try:
             sink.record(report, tool_name=request.tool_name, blocked=blocked)
-        except Exception:  # pragma: no cover - defensive
-            pass
+        except (AttributeError, RuntimeError, TypeError) as exc:
+            _LOGGER.warning(
+                "tool safety telemetry recording failed: %s",
+                type(exc).__name__,
+            )
         event = build_audit_event(
             report=report,
             tool_name=request.tool_name,
@@ -231,18 +277,7 @@ class ToolScriptSafetyFilter:
             timestamp=_utc_now_iso(),
         )
         try:
-            # The audit sink protocol is async; run it via asyncio when
-            # there is a running loop, otherwise schedule a new one.
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop is None:
-                asyncio.run(self.audit_sink.emit(event))
-            else:
-                # We are inside a loop; the wrapper already runs async.
-                # Schedule the emit but do not block the sync ``check``.
-                asyncio.ensure_future(self.audit_sink.emit(event))
+            await self.audit_sink.emit(event)
         except SafetyAuditError:
             if self.policy.audit.required:
                 # Re-raise so the wrapper's fail-closed path engages.
@@ -251,11 +286,46 @@ class ToolScriptSafetyFilter:
             if self.policy.audit.required:
                 raise SafetyAuditError("unexpected audit emit failure")
 
-    def _emit_guard_error(self, tool_name: str, exc: Exception) -> None:
-        # ToolRequestError means we couldn't even build a request. Fail
-        # closed by emitting an audit-shaped event and letting the caller
-        # decide how to render the block.
-        return None
+    def _build_request(
+        self,
+        tool_name: str,
+        args: Mapping[str, Any],
+        *,
+        tool_kind: ToolKind,
+        metadata: Mapping[str, Any] | None,
+    ) -> SafetyScanRequest:
+        adapter = resolve_adapter(tool_name, self.policy,
+                                  builtin=self._builtin)
+        request = adapter.build_request(
+            args, metadata=metadata,
+        ) if _looks_like_args_dict(args) else _build_request_from_raw(
+            tool_name, tool_kind, args, adapter,
+        )
+        if request.tool_kind == ToolKind.UNKNOWN:
+            return request.model_copy(update={"tool_kind": tool_kind})
+        return request
+
+    def _run_sync(
+        self,
+        coroutine: Coroutine[Any, Any, _ResultT],
+    ) -> _ResultT:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coroutine)
+        coroutine.close()
+        raise SafetyAuditError(
+            "synchronous safety enforcement cannot run inside an event loop; "
+            "use the async interface so required audit I/O is awaited"
+        )
+
+    def blocks_execution(self, report: SafetyReport) -> bool:
+        """Return whether policy requires this report to block execution."""
+
+        return report.decision == SafetyDecision.DENY or (
+            report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
+            and self.policy.defaults.human_review_blocks_execution
+        )
 
     def _set_trace_args(
         self,

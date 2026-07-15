@@ -59,6 +59,16 @@ def test_invalid_policy_exit_4(tmp_path):
     assert proc.returncode == 4
 
 
+def test_required_audit_failure_exits_4(tmp_path):
+    rc, out, err = _run_cli(
+        "--language", "python",
+        "--script", "print('hello')",
+        "--audit-file", str(tmp_path),
+    )
+    assert rc == 4
+    assert "audit error:" in err
+
+
 def test_manifest_writes_output(tmp_path):
     manifest = REPO_ROOT / "examples" / "tool_safety" / "samples" / "manifest.yaml"
     output = tmp_path / "out.json"

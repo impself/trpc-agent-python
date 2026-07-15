@@ -22,7 +22,7 @@ from tool.safety._models import (
     SafetyScanRequest,
 )
 from tool.safety._policy import POLICY_VERSION, ToolSafetyPolicy
-from tool.safety._redaction import Redactor
+from tool.safety._redaction import Redactor, evidence_was_redacted
 from tool.safety._rules import SafetyRule, default_rules
 
 INTERNAL_ERROR_RULE_ID = "GUARD001_INTERNAL_ERROR"
@@ -80,6 +80,22 @@ class ToolSafetyGuard:
         findings = _deduplicate(findings)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         return self._build_report(request, findings, elapsed_ms, redactor)
+
+    def error_report(
+        self,
+        request: SafetyScanRequest,
+        error: Exception,
+    ) -> SafetyReport:
+        """Create a fail-closed report when request normalization fails.
+
+        The execution adapters use this instead of dropping an audit event
+        when they cannot construct a complete scan request.
+        """
+        started = time.perf_counter()
+        redactor = Redactor(env_values=request.env.values())
+        finding = self._internal_error_finding(error, redactor, request)
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        return self._build_report(request, [finding], elapsed_ms, redactor)
 
     # ----- internals ----- #
 
@@ -174,7 +190,10 @@ class ToolSafetyGuard:
             policy_version=self.policy_version,
             script_sha256=script_sha,
             scan_duration_ms=elapsed_ms,
-            redacted=redactor.active,
+            redacted=redactor.active or any(
+                evidence_was_redacted(finding.evidence)
+                for finding in findings
+            ),
         )
 
 

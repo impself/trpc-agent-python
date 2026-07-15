@@ -11,6 +11,7 @@ are applied at finding construction time so the catalog stays declarative.
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Iterable, Protocol, Sequence, runtime_checkable
 
 from tool.safety._facts import (
@@ -296,6 +297,43 @@ def check_network_non_allowlist(
             language=language,
             redactor=redactor,
             recommendation="Host is not on the allow list; add it explicitly.",
+            extras={"host": fact.target, "library": fact.library},
+        ))
+    return out
+
+
+def check_network_ip_literals(
+    facts: ScriptFacts,
+    policy: ToolSafetyPolicy,
+    language: ScriptLanguage,
+    redactor: Redactor,
+) -> list[SafetyFinding]:
+    """Reject literal IP targets when the policy disables them.
+
+    This remains separate from the domain allowlist rule: an operator may
+    deliberately allow a loopback IP for a local test service, but still
+    choose whether IP literals are globally acceptable.
+    """
+
+    if not policy.network.deny_ip_literals:
+        return []
+    out: list[SafetyFinding] = []
+    for fact in facts.network_calls:
+        if fact.dynamic or not _is_ip_literal(fact.target):
+            continue
+        decision = resolve_decision(
+            "NET003_IP_LITERAL", SafetyDecision.DENY, policy)
+        out.append(_finding(
+            rule_id="NET003_IP_LITERAL",
+            category=RiskCategory.NETWORK,
+            risk=RiskLevel.HIGH,
+            decision=decision,
+            snippet=fact.snippet,
+            line=fact.loc.line,
+            column=fact.loc.column,
+            language=language,
+            redactor=redactor,
+            recommendation="Use an explicitly allowlisted DNS name instead of an IP literal.",
             extras={"host": fact.target, "library": fact.library},
         ))
     return out
@@ -645,8 +683,8 @@ def check_concurrency(
     redactor: Redactor,
 ) -> list[SafetyFinding]:
     out: list[SafetyFinding] = []
-    threshold = policy.limits.max_parallel_tasks
     for fact in facts.concurrency:
+        threshold = _concurrency_limit_for(fact, policy)
         if fact.count is None:
             decision = resolve_decision(
                 "RES004_CONCURRENCY",
@@ -872,6 +910,7 @@ CATALOG = (
     check_file_credential_read,
     check_file_dotenv_read,
     check_network_non_allowlist,
+    check_network_ip_literals,
     check_network_dynamic_target,
     check_process_exec,
     check_shell_injection,
@@ -962,6 +1001,29 @@ def _first_token(command: str) -> str:
     if not command:
         return ""
     return command.strip().split()[0] if command.strip() else ""
+
+
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
+def _concurrency_limit_for(
+    fact: ConcurrencyFact,
+    policy: ToolSafetyPolicy,
+) -> int:
+    process_primitives = {
+        "multiprocessing.Process",
+        "multiprocessing.Pool",
+        "concurrent.futures.ProcessPoolExecutor",
+        "background-jobs",
+    }
+    if fact.raw in process_primitives:
+        return policy.limits.max_processes
+    return policy.limits.max_parallel_tasks
 
 
 # Read-only / informational Bash commands that are exempt from PROC001.

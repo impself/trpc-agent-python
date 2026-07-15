@@ -60,6 +60,12 @@ def test_pip_install_denies(guard):
     assert report.decision == SafetyDecision.DENY
 
 
+def test_python_module_pip_install_denies(guard):
+    report = scan(guard, "python -m pip install numpy\n")
+    assert "DEP001_ENV_MUTATION" in report.rule_ids
+    assert report.decision == SafetyDecision.DENY
+
+
 def test_apt_install_denies(guard):
     report = scan(guard, "apt-get install -y curl\n")
     assert "DEP001_ENV_MUTATION" in report.rule_ids
@@ -99,6 +105,29 @@ def test_unbounded_loop_denies(guard):
 def test_dynamic_eval_review(guard):
     report = scan(guard, "eval \"$(base64 -d <<<'xxx')\"\n")
     assert "OBF001_DYNAMIC_EXEC" in report.rule_ids
+
+
+@pytest.mark.parametrize("script", [
+    "source ./payload.sh\n",
+    "xargs -a commands.txt sh\n",
+    r"find . -exec sh {} \;\n",
+])
+def test_indirect_execution_requires_review(guard, script):
+    report = scan(guard, script)
+    assert "OBF001_DYNAMIC_EXEC" in report.rule_ids
+    assert report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
+
+
+@pytest.mark.parametrize("script", [
+    "python payload.py\n",
+    "node payload.js\n",
+    "bash -x payload.sh\n",
+    "python -m untrusted_module\n",
+])
+def test_interpreter_payload_requires_review(guard, script):
+    report = scan(guard, script)
+    assert "OBF001_DYNAMIC_EXEC" in report.rule_ids
+    assert report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
 
 
 def test_shebang_and_comment_ignored(guard):

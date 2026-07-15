@@ -51,10 +51,10 @@ permissions, and runtime resource limits.
 
 | Layer | Owns |
 |---|---|
-| **ToolScriptSafetyFilter** | Pre-execution static policy decision and redaction |
-| **SafetyCheckedExecutor** | Applies the same decision before delegated execution |
+| **SafetyWrappedCallable / SafetyCheckedExecutor** | Current enforcement path: scan, await audit, then delegate only when allowed |
+| **ToolScriptSafetyFilter** | Normalizes and records decisions for wrappers and a future SDK terminal hook |
 | **Wrapper / Sandbox / Runtime** | Runtime isolation: CPU, memory, PID, FS, network hard limits |
-| **Audit / Telemetry** | Evidence that a decision occurred; **not** enforcement |
+| **Audit / Telemetry** | Decision evidence; required audit persistence is part of the wrapper's fail-closed gate |
 
 ## Quick start
 
@@ -119,6 +119,13 @@ safe_run = SafetyWrappedCallable(
 safe_run("ls -la")  # raises BlockedExecutionError if policy denies
 ```
 
+Call ``await safe_run.call_async(...)`` instead when the delegate or caller
+already runs inside an event loop; this preserves the required-audit
+before-delegate guarantee.
+For a tool-style callable, set ``argv_kw``, ``cwd_kw``, ``env_kw``,
+``metadata_kw``, and ``output_bytes_kw`` to the corresponding argument
+names so the normalized request contains every available execution field.
+
 ### Wrapping a code executor
 
 ```python
@@ -148,6 +155,7 @@ change between releases so policy overrides remain stable.
 | `FILE004_DOTENV_READ` | file | deny | Reads of `.env` files |
 | `NET001_DOMAIN_NOT_ALLOWED` | network | deny | Requests/curl/wget to non-allowlisted hosts |
 | `NET002_DYNAMIC_TARGET` | network | review | Computed network destination |
+| `NET003_IP_LITERAL` | network | deny | IP literal when `deny_ip_literals` is enabled |
 | `PROC001_PROCESS_EXEC` | process | review | Subprocess or command not on allow list |
 | `PROC002_SHELL_INJECTION` | process | deny | `shell=True` with shell grammar |
 | `PROC003_SHELL_OPERATOR` | process | review | `;`, `&&`, `\|`, `&`, command substitution |
@@ -156,13 +164,13 @@ change between releases so policy overrides remain stable.
 | `RES001_UNBOUNDED_LOOP` | resource | deny | `while True` without break |
 | `RES002_FORK_BOMB` | resource | deny | Classic `:(){ :\|:& };:` pattern |
 | `RES003_LONG_SLEEP` | resource | deny | Sleeps exceeding policy limit |
-| `RES004_CONCURRENCY` | resource | deny | Fan-out exceeding `max_parallel_tasks` |
+| `RES004_CONCURRENCY` | resource | deny | Fan-out exceeding `max_parallel_tasks` or `max_processes` |
 | `RES005_LARGE_WRITE` | resource | deny | Writes exceeding `max_file_write_bytes` |
 | `SECRET001_LOG_SINK` | secret | deny | Tainted value into print/log |
 | `SECRET002_FILE_SINK` | secret | deny | Tainted value into file write |
 | `SECRET003_NETWORK_SINK` | secret | deny | Tainted value into network payload |
 | `PARSE001_UNCERTAIN` | analysis | review | Syntax error or unknown construct |
-| `OBF001_DYNAMIC_EXEC` | analysis | review | `eval`, `exec`, `importlib`, reflective calls |
+| `OBF001_DYNAMIC_EXEC` | analysis | review | `eval`, `exec`, indirect Bash execution, interpreter payloads |
 | `SAFE000` | safe | allow | No findings |
 | `GUARD001_INTERNAL_ERROR` | analysis | deny | Internal guard failure (fail closed) |
 
@@ -272,19 +280,20 @@ never emitted as span attributes or metric labels.
 | 0 | Final decision was ``allow`` |
 | 2 | Final decision was ``deny`` |
 | 3 | Final decision was ``needs_human_review`` |
-| 4 | Invalid input / policy error |
+| 4 | Invalid input, policy, or required-audit error |
 
 ## Integration with the SDK
 
-The standalone package is duck-typed to ``BaseFilter`` so it can be
-composed with the framework's filter runner once the terminal-phase
-ordering seam is exposed. Until then, wrap the executor or callable
-explicitly via ``tool.wrapper``.
+The current SDK does not expose a terminal filter phase after
+``ToolCallbackFilter``. A configured ``filters=`` instance can therefore
+scan arguments that a later callback changes; it is not a secure enforcement
+point. Use ``SafetyWrappedCallable`` or ``SafetyCheckedExecutor`` today:
+both scan, await the audit event, and only then invoke their delegate.
 
-The :class:`ToolScriptSafetyFilter` carries a ``terminal_before_handler``
-attribute (always ``True``). When the framework adopts the terminal
-phase marker, the filter will automatically run after
-``ToolCallbackFilter`` and prevent TOCTOU mutations.
+``ToolScriptSafetyFilter`` provides matching ``_before``/``_after`` hooks
+and a ``terminal_before_handler`` marker for a future SDK terminal phase.
+That marker is metadata only until the framework implements ordering after
+all argument-mutating callbacks. The wrapper remains mandatory until then.
 
 ## Custom rules
 
@@ -324,6 +333,10 @@ Rules must be pure: no file I/O, network access, or process creation.
 * **Runtime downloads.** A script that downloads and executes a payload
   in two stages defeats static analysis. Network egress policy and
   sandboxing are mandatory.
+* **Runtime limits.** The wrapper validates the declared timeout and caps
+  returned output, but it cannot impose CPU, memory, PID, file-size, or
+  network limits on an arbitrary executor. Configure those in the sandbox
+  or CodeExecutor runtime as well.
 * **Shell grammar holes.** The bash lexer-lite is conservative: any
   unbalanced quote or unsupported substitution becomes
   ``PARSE001_UNCERTAIN``.

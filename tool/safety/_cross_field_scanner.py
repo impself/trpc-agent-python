@@ -22,7 +22,6 @@ from tool.safety._models import (
 )
 from tool.safety._policy import (
     ToolSafetyPolicy,
-    is_sensitive_env_key,
     match_path_glob,
     normalize_script_path_for_match,
 )
@@ -38,7 +37,6 @@ from tool.safety._rules import (
 _CWD_RULE_ID = "FILE002_DENIED_WRITE"
 _TIMEOUT_RULE_ID = "RES003_LONG_SLEEP"
 _ARGV_RULE_ID = "PROC001_PROCESS_EXEC"
-_ENV_RULE_ID = "SECRET001_LOG_SINK"
 _TOOL_MAPPING_RULE_ID = "PARSE001_UNCERTAIN"
 
 
@@ -57,7 +55,6 @@ class CrossFieldScannerRule(SafetyRule):
         findings.extend(self._check_cwd(request, policy, redactor))
         findings.extend(self._check_timeout(request, policy, redactor))
         findings.extend(self._check_argv(request, policy, redactor))
-        findings.extend(self._check_env_secrets(request, policy, redactor))
         findings.extend(self._check_tool_mapping(request, policy, redactor))
         findings.extend(self._check_output_budget(request, policy, redactor))
         return findings
@@ -179,45 +176,6 @@ class CrossFieldScannerRule(SafetyRule):
                     recommendation="argv contains an executable not on the allow list.",
                     extras={"index": str(idx), "executable": token},
                 ))
-        return findings
-
-    def _check_env_secrets(
-        self,
-        request: SafetyScanRequest,
-        policy: ToolSafetyPolicy,
-        redactor: Redactor,
-    ) -> list[SafetyFinding]:
-        if not request.env:
-            return []
-        findings: list[SafetyFinding] = []
-        # We do not know whether a secret actually flows out via the script,
-        # but if the script also writes to output/file/network and the env
-        # set contains sensitive keys, flag as needs_human_review so a human
-        # confirms intent. Pure existence of a secret key is *not* a deny.
-        sensitive_keys = sorted({
-            key for key in request.env
-            if is_sensitive_env_key(key, policy.sensitive_env_key_patterns)
-        })
-        if not sensitive_keys:
-            return []
-        decision = resolve_decision(
-            _ENV_RULE_ID,
-            SafetyDecision.NEEDS_HUMAN_REVIEW,
-            policy,
-        )
-        if decision == SafetyDecision.ALLOW:
-            return []
-        findings.append(_finding(
-            rule_id=_ENV_RULE_ID,
-            category=RiskCategory.SECRET,
-            risk=RiskLevel.MEDIUM,
-            decision=decision,
-            snippet=f"env contains {len(sensitive_keys)} sensitive key(s)",
-            language=ScriptLanguage.UNKNOWN,
-            redactor=redactor,
-            recommendation="Confirm that sensitive env values are not forwarded to sinks.",
-            extras={"keys": ",".join(sorted(sensitive_keys))},
-        ))
         return findings
 
     def _check_tool_mapping(

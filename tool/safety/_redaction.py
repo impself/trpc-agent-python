@@ -53,6 +53,7 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 _PLACEHOLDER = "<REDACTED:{kind}:{digest}>"
 _ENV_PLACEHOLDER = "<REDACTED:env:{digest}>"
+_REDACTION_MARKER = "<REDACTED:"
 
 
 def _digest(value: str) -> str:
@@ -74,11 +75,11 @@ class Redactor:
         # substrings of the same value can match.
         values = sorted({v for v in env_values if v}, key=len, reverse=True)
         self._env_values = values
-        self._active = bool(values)
+        self._active = False
 
     @property
     def active(self) -> bool:
-        """Whether any env values were registered for redaction."""
+        """Whether this redactor has replaced a secret in emitted evidence."""
 
         return self._active
 
@@ -92,8 +93,12 @@ class Redactor:
             if value and value in redacted:
                 placeholder = _ENV_PLACEHOLDER.format(digest=_digest(value))
                 redacted = redacted.replace(value, placeholder)
+                self._active = True
         for kind, pattern in _SECRET_PATTERNS:
+            before = redacted
             redacted = _apply_pattern(redacted, kind, pattern)
+            if redacted != before:
+                self._active = True
         return redacted
 
     def truncate(self, text: str) -> str:
@@ -144,6 +149,26 @@ def _apply_pattern(text: str, kind: str, pattern: re.Pattern[str]) -> str:
         return placeholder
 
     return pattern.sub(_sub, text)
+
+
+def contains_secret_literal(value: str) -> bool:
+    """Return whether a string literal resembles a credential.
+
+    This is intentionally shared with :class:`Redactor` so a literal that is
+    blocked as a potential leak is guaranteed to be redacted in its evidence.
+    """
+
+    return any(pattern.search(value) is not None
+               for _, pattern in _SECRET_PATTERNS)
+
+
+def evidence_was_redacted(evidence: Evidence) -> bool:
+    """Return whether serialized evidence contains a redaction placeholder."""
+
+    if _REDACTION_MARKER in evidence.snippet:
+        return True
+    return any(_REDACTION_MARKER in value
+               for value in evidence.extras.values())
 
 
 def make_default_redactor(env_values: Iterable[str] = ()) -> Redactor:

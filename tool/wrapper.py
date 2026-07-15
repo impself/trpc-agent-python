@@ -21,14 +21,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, Mapping, TypeVar
 
 from tool.safety._audit import AuditSink, InMemoryAuditSink, NullAuditSink
 from tool.safety._filter import BlockedExecutionError, ToolScriptSafetyFilter
 from tool.safety._guard import ToolSafetyGuard
 from tool.safety._models import (
-    RiskLevel,
-    SafetyDecision,
     SafetyReport,
     SafetyScanRequest,
     ScriptLanguage,
@@ -69,6 +67,9 @@ class SafetyWrappedCallable(Generic[T]):
         cwd_kw: str | None = None,
         env_kw: str | None = None,
         timeout_kw: str | None = None,
+        argv_kw: str | None = None,
+        metadata_kw: str | None = None,
+        output_bytes_kw: str | None = None,
         filter: ToolScriptSafetyFilter | None = None,
     ) -> None:
         if (script_kw is None) == (script_pos is None):
@@ -84,6 +85,9 @@ class SafetyWrappedCallable(Generic[T]):
         self.cwd_kw = cwd_kw
         self.env_kw = env_kw
         self.timeout_kw = timeout_kw
+        self.argv_kw = argv_kw
+        self.metadata_kw = metadata_kw
+        self.output_bytes_kw = output_bytes_kw
         self._filter = filter or ToolScriptSafetyFilter(
             guard, audit_sink=_default_audit_sink(guard.policy))
 
@@ -96,7 +100,7 @@ class SafetyWrappedCallable(Generic[T]):
             _ = report  # caller can inspect via last_report
 
     async def call_async(self, *args: Any, **kwargs: Any) -> T:
-        report = self._enforce(args, kwargs)
+        report = await self._enforce_async(args, kwargs)
         result = self.delegate(*args, **kwargs)
         if inspect.isawaitable(result):
             return await result
@@ -111,28 +115,45 @@ class SafetyWrappedCallable(Generic[T]):
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> SafetyReport:
+        request = self._build_request(args, kwargs)
+        return self._filter.enforce_request(request)
+
+    async def _enforce_async(
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> SafetyReport:
+        request = self._build_request(args, kwargs)
+        return await self._filter.enforce_request_async(request)
+
+    def _build_request(
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> SafetyScanRequest:
         script = self._extract_script(args, kwargs)
         cwd = kwargs.get(self.cwd_kw) if self.cwd_kw else None
         env = kwargs.get(self.env_kw) if self.env_kw else None
         timeout = kwargs.get(self.timeout_kw) if self.timeout_kw else None
-        request = SafetyScanRequest(
+        argv = kwargs.get(self.argv_kw) if self.argv_kw else None
+        metadata = kwargs.get(self.metadata_kw) if self.metadata_kw else None
+        output_bytes = kwargs.get(self.output_bytes_kw) \
+            if self.output_bytes_kw else None
+        return SafetyScanRequest(
             tool_name=self.tool_name,
             tool_kind=self.tool_kind,
             language=self.language,
             script=script or "",
             cwd=str(cwd) if cwd is not None else None,
             env={str(k): str(v) for k, v in (env or {}).items()}
-                if isinstance(env, dict) else {},
+                if isinstance(env, Mapping) else {},
+            argv=_coerce_argv(argv),
+            metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
             requested_timeout_seconds=float(timeout)
                 if isinstance(timeout, (int, float)) else None,
+            requested_output_bytes=int(output_bytes)
+                if isinstance(output_bytes, int) else None,
         )
-        report = self.guard.scan(request)
-        if report.decision == SafetyDecision.ALLOW:
-            return report
-        if report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW \
-                and not self.guard.policy.defaults.human_review_blocks_execution:
-            return report
-        raise BlockedExecutionError(report)
 
     def _extract_script(
         self,
@@ -204,28 +225,11 @@ class SafetyCheckedExecutor:
             policy_version=self.guard.policy_version,
             scan_duration_ms=sum(r.scan_duration_ms for r in reports),
         )
-        blocked = combined.decision in (
-            SafetyDecision.DENY, SafetyDecision.NEEDS_HUMAN_REVIEW,
-        ) and self.guard.policy.defaults.human_review_blocks_execution
-        # Audit
-        from tool.safety._telemetry import build_audit_event
-        event = build_audit_event(
-            report=combined,
-            tool_name=self.tool_name,
-            tool_kind=ToolKind.CODE_EXECUTOR,
-            execution_blocked=blocked,
-            timestamp=_utc_now_iso(),
-        )
-        await self._filter.audit_sink.emit(event)
+        blocked = self._filter.blocks_execution(combined)
+        await self._filter.record_report_async(
+            requests[0], combined, blocked=blocked)
         if blocked:
             return _render_executor_block(combined)
-        if self.effective_timeout_seconds is not None \
-                and self.effective_timeout_seconds \
-                > self.guard.policy.limits.max_timeout_seconds:
-            return _make_failure_result(
-                f"effective_timeout_seconds={self.effective_timeout_seconds} "
-                f"exceeds policy max "
-                f"{self.guard.policy.limits.max_timeout_seconds}")
         result = await self.delegate.execute_code(execution_input)
         return _truncate_output(result,
                                 self.guard.policy.limits.max_output_bytes)
@@ -233,13 +237,18 @@ class SafetyCheckedExecutor:
     def _build_requests(self, execution_input: Any) -> list[SafetyScanRequest]:
         blocks = _extract_code_blocks(execution_input)
         requests: list[SafetyScanRequest] = []
-        for idx, block in enumerate(blocks):
+        for idx, (block, block_language) in enumerate(blocks):
+            language = block_language or self.language
+            metadata: dict[str, Any] = {"block_index": idx}
+            if language == ScriptLanguage.UNKNOWN:
+                metadata["execution_capable"] = True
             requests.append(SafetyScanRequest(
                 tool_name=self.tool_name,
                 tool_kind=ToolKind.CODE_EXECUTOR,
-                language=self.language,
+                language=language,
                 script=block,
-                metadata={"block_index": idx},
+                metadata=metadata,
+                requested_timeout_seconds=self.effective_timeout_seconds,
             ))
         return requests
 
@@ -257,36 +266,73 @@ def _default_audit_sink(policy: ToolSafetyPolicy) -> AuditSink:
     return InMemoryAuditSink()
 
 
-def _extract_code_blocks(execution_input: Any) -> list[str]:
-    """Pull a list of code strings from common input shapes."""
+def _coerce_argv(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, (list, tuple)):
+        return tuple(str(item) for item in value)
+    return ()
+
+
+def _extract_code_blocks(
+    execution_input: Any,
+) -> list[tuple[str, ScriptLanguage | None]]:
+    """Pull code and declared language from common execution-input shapes."""
 
     if isinstance(execution_input, str):
-        return [execution_input]
-    if isinstance(execution_input, Mapping):  # type: ignore[arg-type]
+        return [(execution_input, None)]
+    if isinstance(execution_input, Mapping):
+        blocks = _normalize_code_blocks(execution_input.get("code_blocks"))
+        if blocks:
+            return blocks
         code = execution_input.get("code") or execution_input.get("script")  # type: ignore[union-attr]
         if isinstance(code, str):
-            return [code]
+            return [(code, _coerce_script_language(
+                execution_input.get("language")))]
         if isinstance(code, (list, tuple)):
-            return [str(b) for b in code]
+            return [(str(block), None) for block in code]
     code_blocks = getattr(execution_input, "code_blocks", None)
     if code_blocks is not None:
-        out: list[str] = []
-        for block in code_blocks:
-            text = getattr(block, "code", None)
-            if isinstance(text, str):
-                out.append(text)
-                continue
-            if isinstance(block, str):
-                out.append(block)
-                continue
-            code_attr = getattr(block, "code", None)
-            if isinstance(code_attr, str):
-                out.append(code_attr)
-        return out
+        blocks = _normalize_code_blocks(code_blocks)
+        if blocks:
+            return blocks
     code_attr = getattr(execution_input, "code", None)
     if isinstance(code_attr, str):
-        return [code_attr]
+        return [(code_attr, _coerce_script_language(
+            getattr(execution_input, "language", None)))]
     return []
+
+
+def _normalize_code_blocks(
+    raw_blocks: Any,
+) -> list[tuple[str, ScriptLanguage | None]]:
+    if not isinstance(raw_blocks, (list, tuple)):
+        return []
+    blocks: list[tuple[str, ScriptLanguage | None]] = []
+    for block in raw_blocks:
+        if isinstance(block, str):
+            blocks.append((block, None))
+            continue
+        if isinstance(block, Mapping):
+            code = block.get("code")
+            language = block.get("language")
+        else:
+            code = getattr(block, "code", None)
+            language = getattr(block, "language", None)
+        if isinstance(code, str):
+            blocks.append((code, _coerce_script_language(language)))
+    return blocks
+
+
+def _coerce_script_language(value: Any) -> ScriptLanguage | None:
+    if value is None or not str(value).strip():
+        return None
+    normalized = str(value).strip().lower()
+    aliases = {"sh": "bash", "shell": "bash", "zsh": "bash", "py": "python"}
+    try:
+        return ScriptLanguage(aliases.get(normalized, normalized))
+    except ValueError:
+        return ScriptLanguage.UNKNOWN
 
 
 def _make_failure_result(message: str) -> Any:
@@ -320,24 +366,28 @@ def _render_executor_block(report: SafetyReport) -> Any:
 def _truncate_output(result: Any, max_bytes: int) -> Any:
     if max_bytes <= 0:
         return result
-    output = getattr(result, "output", None)
+    output = result.get("output") if isinstance(result, Mapping) \
+        else getattr(result, "output", None)
     if isinstance(output, str):
         encoded = output.encode("utf-8", errors="ignore")
         if len(encoded) <= max_bytes:
             return result
-        truncated = encoded[:max_bytes].decode("utf-8", errors="ignore")
+        marker = f"\n[truncated {len(encoded) - max_bytes} bytes]"
+        marker_bytes = marker.encode("utf-8")
+        if len(marker_bytes) >= max_bytes:
+            replacement = marker_bytes[:max_bytes].decode(
+                "utf-8", errors="ignore")
+        else:
+            prefix_bytes = encoded[:max_bytes - len(marker_bytes)]
+            prefix = prefix_bytes.decode("utf-8", errors="ignore")
+            replacement = prefix + marker
+        if isinstance(result, dict):
+            result["output"] = replacement
+            return result
+        if isinstance(result, Mapping):
+            return {**result, "output": replacement}
         try:
-            object.__setattr__(result, "output",
-                               truncated + f"\n[truncated {len(encoded) - max_bytes} bytes]")
+            object.__setattr__(result, "output", replacement)
         except (AttributeError, TypeError):
-            return truncated
+            return replacement
     return result
-
-
-def _utc_now_iso() -> str:
-    import datetime as _dt
-    return _dt.datetime.now(_dt.timezone.utc).isoformat()
-
-
-# Re-export Mapping for the isinstance check above.
-from typing import Mapping  # noqa: E402

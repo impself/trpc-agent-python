@@ -61,7 +61,7 @@ def test_denied_executable_in_argv_blocks(guard):
     assert report.decision == SafetyDecision.DENY
 
 
-def test_sensitive_env_triggers_review(guard):
+def test_unused_sensitive_env_does_not_trigger_review(guard):
     request = SafetyScanRequest(
         tool_name="t",
         language=ScriptLanguage.PYTHON,
@@ -69,8 +69,8 @@ def test_sensitive_env_triggers_review(guard):
         env={"API_TOKEN": "abc"},
     )
     report = guard.scan(request)
-    assert "SECRET001_LOG_SINK" in report.rule_ids
-    assert report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
+    assert "SECRET001_LOG_SINK" not in report.rule_ids
+    assert report.decision == SafetyDecision.ALLOW
 
 
 def test_output_budget_enforced(guard):

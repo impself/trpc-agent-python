@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
+
 import pytest
 
 from tool.safety._audit import InMemoryAuditSink
@@ -54,6 +57,30 @@ def test_audit_event_one_per_call(flt):
     for _ in range(3):
         flt.check("workspace_exec", {"command": "echo hi"})
     assert len(flt.audit_sink.events) == 3  # type: ignore[attr-defined]
+
+
+def test_check_async_persists_audit_before_returning(flt):
+    async def run():
+        decision, _ = await flt.check_async(
+            "workspace_exec", {"command": "echo hi"})
+        assert decision == SafetyDecision.ALLOW
+        assert len(flt.audit_sink.events) == 1  # type: ignore[attr-defined]
+
+    asyncio.run(run())
+
+
+def test_filter_audits_request_build_failure(flt):
+    rsp = {}
+
+    async def run():
+        await flt._before(
+            SimpleNamespace(tool_name="workspace_exec"), {}, rsp)
+
+    asyncio.run(run())
+
+    assert rsp["is_continue"] is False
+    assert len(flt.audit_sink.events) == 1  # type: ignore[attr-defined]
+    assert flt.audit_sink.events[0].decision == SafetyDecision.DENY  # type: ignore[attr-defined]
 
 
 def test_filter_redacts_env_in_trace(flt):

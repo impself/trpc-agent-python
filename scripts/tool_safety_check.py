@@ -37,6 +37,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from tool.safety._audit import InMemoryAuditSink, JsonlAuditSink  # noqa: E402
+from tool.safety._exceptions import SafetyAuditError  # noqa: E402
 from tool.safety._guard import ToolSafetyGuard  # noqa: E402
 from tool.safety._models import (  # noqa: E402
     SafetyDecision,
@@ -59,11 +60,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 4
     guard = ToolSafetyGuard(policy)
     audit_sink = _resolve_audit_sink(args, policy)
-    if args.manifest:
-        return _run_manifest(guard, audit_sink, args)
-    if args.request_json:
-        return _run_request_json(guard, audit_sink, args)
-    return _run_single(guard, audit_sink, args)
+    try:
+        if args.manifest:
+            return _run_manifest(guard, audit_sink, args)
+        if args.request_json:
+            return _run_request_json(guard, audit_sink, args)
+        return _run_single(guard, audit_sink, args)
+    except SafetyAuditError as exc:
+        print(f"audit error: {exc}", file=sys.stderr)
+        return 4
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -165,7 +170,13 @@ def _run_manifest(guard: ToolSafetyGuard,
             "matches_expected": _decision_matches(report, expected),
         })
         blocked = report.decision != SafetyDecision.ALLOW
-        asyncio.run(_emit_audit(audit_sink, report, request, blocked=blocked))
+        asyncio.run(_emit_audit(
+            audit_sink,
+            report,
+            request,
+            blocked=blocked,
+            required=guard.policy.audit.required,
+        ))
         exit_code = max(exit_code, _exit_for_decision(report.decision))
     if args.manifest_output:
         with open(args.manifest_output, "w", encoding="utf-8") as handle:
@@ -182,8 +193,13 @@ def _emit(guard: ToolSafetyGuard,
           args: argparse.Namespace,
           request: SafetyScanRequest) -> int:
     report = guard.scan(request)
-    asyncio.run(_emit_audit(audit_sink, report, request,
-                            blocked=report.decision != SafetyDecision.ALLOW))
+    asyncio.run(_emit_audit(
+        audit_sink,
+        report,
+        request,
+        blocked=report.decision != SafetyDecision.ALLOW,
+        required=guard.policy.audit.required,
+    ))
     payload = report.model_dump_json(indent=2)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as handle:
@@ -193,7 +209,8 @@ def _emit(guard: ToolSafetyGuard,
 
 
 async def _emit_audit(audit_sink: Any, report: SafetyReport,
-                      request: SafetyScanRequest, *, blocked: bool) -> None:
+                      request: SafetyScanRequest, *, blocked: bool,
+                      required: bool) -> None:
     import datetime as _dt
     event = build_audit_event(
         report=report,
@@ -205,8 +222,11 @@ async def _emit_audit(audit_sink: Any, report: SafetyReport,
     try:
         await audit_sink.emit(event)
     except Exception as exc:
-        # Audit failures should not crash the CLI; surface them on stderr.
         print(f"audit emit warning: {exc}", file=sys.stderr)
+        if required:
+            if isinstance(exc, SafetyAuditError):
+                raise
+            raise SafetyAuditError("unexpected audit emit failure") from exc
 
 
 def _build_request(args: argparse.Namespace) -> SafetyScanRequest:

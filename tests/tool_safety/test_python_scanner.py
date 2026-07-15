@@ -63,6 +63,26 @@ def test_allowlist_network_allows(guard):
     assert report.decision == SafetyDecision.ALLOW
 
 
+def test_ip_literal_policy_can_block_an_allowlisted_ip(strict_policy_dict):
+    policy_dict = strict_policy_dict.copy()
+    policy_dict["network"] = {
+        "allow_domains": ["127.0.0.1"],
+        "deny_ip_literals": True,
+    }
+    blocked_guard = ToolSafetyGuard(load_safety_policy_dict(policy_dict))
+    script = "import requests\nrequests.get('http://127.0.0.1:8080')\n"
+    blocked = scan(blocked_guard, script)
+    assert "NET003_IP_LITERAL" in blocked.rule_ids
+    assert blocked.decision == SafetyDecision.DENY
+
+    policy_dict["network"] = {
+        "allow_domains": ["127.0.0.1"],
+        "deny_ip_literals": False,
+    }
+    allowed_guard = ToolSafetyGuard(load_safety_policy_dict(policy_dict))
+    assert scan(allowed_guard, script).decision == SafetyDecision.ALLOW
+
+
 def test_fstring_allowlist_network_allows(guard):
     script = "import requests\nrequests.get(f'https://api.github.com/users/{name}')\n"
     report = scan(guard, script)
@@ -108,11 +128,34 @@ def test_long_sleep_denies(guard):
     assert report.decision == SafetyDecision.DENY
 
 
+def test_process_limit_uses_max_processes(strict_policy_dict):
+    policy_dict = strict_policy_dict.copy()
+    policy_dict["limits"] = dict(policy_dict["limits"])
+    policy_dict["limits"]["max_parallel_tasks"] = 10
+    policy_dict["limits"]["max_processes"] = 2
+    g = ToolSafetyGuard(load_safety_policy_dict(policy_dict))
+    report = scan(
+        g,
+        "import multiprocessing\nmultiprocessing.Pool(processes=3)\n",
+    )
+    assert "RES004_CONCURRENCY" in report.rule_ids
+    assert report.decision == SafetyDecision.DENY
+
+
 def test_secret_to_print_denies(guard):
     script = "import os\nv=os.environ['API_TOKEN']\nprint(v)\n"
     report = scan(guard, script)
     assert "SECRET001_LOG_SINK" in report.rule_ids
     assert report.decision == SafetyDecision.DENY
+
+
+def test_literal_api_key_to_print_denies_and_redacts(guard):
+    secret = "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
+    report = scan(guard, f"print('{secret}')\n")
+    assert "SECRET001_LOG_SINK" in report.rule_ids
+    assert report.decision == SafetyDecision.DENY
+    assert report.redacted is True
+    assert secret not in report.model_dump_json()
 
 
 def test_secret_to_log_denies(guard):

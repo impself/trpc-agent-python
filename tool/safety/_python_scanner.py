@@ -38,6 +38,7 @@ from tool.safety._facts import (
 from tool.safety._models import ScriptLanguage
 from tool.safety._rules import _LanguageScannerRule, SafetyRule
 from tool.safety._policy import is_sensitive_env_key
+from tool.safety._redaction import contains_secret_literal
 
 
 # Networks libs and the attribute used to extract a host arg.
@@ -917,8 +918,12 @@ class _PythonScanner:
         return False
 
     def _expr_tainted(self, node: ast.AST) -> bool:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return contains_secret_literal(node.value)
         if isinstance(node, ast.Name):
             return node.id in self._tainted
+        if isinstance(node, ast.Subscript):
+            return self._secret_source_label(node) is not None
         if isinstance(node, ast.JoinedStr):
             return any(self._expr_tainted(v) for v in node.values)
         if isinstance(node, ast.FormattedValue):

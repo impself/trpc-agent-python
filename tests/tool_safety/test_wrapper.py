@@ -39,6 +39,26 @@ def test_wrapped_callable_allows_safe(guard):
     assert calls == ["print('hi')"]
 
 
+def test_wrapped_callable_audits_before_delegate(guard):
+    sink = InMemoryAuditSink()
+    filter_ = ToolScriptSafetyFilter(guard, audit_sink=sink)
+
+    def delegate(script: str) -> str:
+        assert len(sink.events) == 1
+        return "ok"
+
+    wrapped = SafetyWrappedCallable(
+        guard,
+        delegate,
+        tool_name="python_exec",
+        language=ScriptLanguage.PYTHON,
+        script_kw="script",
+        filter=filter_,
+    )
+
+    assert wrapped(script="print('hi')") == "ok"
+
+
 def test_wrapped_callable_blocks_danger(guard):
     def delegate(script: str) -> str:
         return "ran"
@@ -51,6 +71,25 @@ def test_wrapped_callable_blocks_danger(guard):
     )
     with pytest.raises(BlockedExecutionError):
         wrapped(script="import shutil\nshutil.rmtree('/x')")
+
+
+def test_wrapped_callable_scans_explicit_argv_and_metadata(guard):
+    wrapped = SafetyWrappedCallable(
+        guard,
+        lambda **kwargs: "ran",
+        tool_name="python_exec",
+        language=ScriptLanguage.PYTHON,
+        script_kw="script",
+        argv_kw="argv",
+        metadata_kw="metadata",
+    )
+    with pytest.raises(BlockedExecutionError):
+        wrapped(script="print('safe')", argv=["sudo", "ls"])
+    with pytest.raises(BlockedExecutionError):
+        wrapped(
+            script="print('safe')",
+            metadata={"execution_capable": True, "adapter_id": "unknown"},
+        )
 
 
 def test_wrapped_callable_supports_positional(guard):
@@ -106,6 +145,63 @@ def test_executor_deny_does_not_delegate(guard):
     assert "blocked" in result.output or "tool.safety" in result.output
 
 
+def test_executor_scans_code_attribute_when_blocks_are_empty(guard):
+    class FakeInput:
+        code_blocks = []
+        code = "import shutil\nshutil.rmtree('/x')"
+
+    class FakeExecutor:
+        async def execute_code(self, inp):
+            raise AssertionError("unsafe code must not reach the executor")
+
+    sink = InMemoryAuditSink()
+    wrapped = SafetyCheckedExecutor(guard, FakeExecutor(), audit_sink=sink)
+    result = asyncio.run(wrapped.execute_code(FakeInput()))  # noqa: F821
+    assert "FILE001_RECURSIVE_DELETE" in result.output
+    assert len(sink.events) == 1
+
+
+def test_executor_uses_each_block_language(guard):
+    class FakeInput:
+        code_blocks = [type("Block", (), {
+            "language": "bash", "code": "rm -rf /tmp/x",
+        })()]
+
+    class FakeExecutor:
+        async def execute_code(self, inp):
+            raise AssertionError("unsafe Bash must not reach the executor")
+
+    wrapped = SafetyCheckedExecutor(guard, FakeExecutor(),
+                                    audit_sink=InMemoryAuditSink())
+    result = asyncio.run(wrapped.execute_code(FakeInput()))  # noqa: F821
+    assert "FILE001_RECURSIVE_DELETE" in result.output
+
+
+def test_executor_never_delegates_deny_when_review_is_non_blocking(
+    strict_policy_dict,
+):
+    policy_dict = strict_policy_dict.copy()
+    policy_dict["defaults"] = {"human_review_blocks_execution": False}
+    guard = ToolSafetyGuard(load_safety_policy_dict(policy_dict))
+    called = []
+
+    class FakeInput:
+        code_blocks = [type("Block", (), {
+            "language": "bash", "code": "rm -rf /tmp/x",
+        })()]
+
+    class FakeExecutor:
+        async def execute_code(self, inp):
+            called.append(True)
+            return {"outcome": "SUCCESS", "output": "ran"}
+
+    wrapped = SafetyCheckedExecutor(guard, FakeExecutor(),
+                                    audit_sink=InMemoryAuditSink())
+    result = asyncio.run(wrapped.execute_code(FakeInput()))  # noqa: F821
+    assert called == []
+    assert "FILE001_RECURSIVE_DELETE" in result.output
+
+
 def test_executor_truncates_output(guard):
     class FakeInput:
         code_blocks = [type("Block", (), {"code": "print('hi')"})()]
@@ -121,7 +217,26 @@ def test_executor_truncates_output(guard):
     wrapped = SafetyCheckedExecutor(guard, FakeExecutor(),
                                     audit_sink=InMemoryAuditSink())
     result = asyncio.run(wrapped.execute_code(FakeInput()))  # noqa: F821
-    assert len(result.output) < 4096
+    assert len(result.output.encode("utf-8")) <= guard.policy.limits.max_output_bytes
+
+
+def test_executor_truncates_dict_output(strict_policy_dict):
+    policy_dict = strict_policy_dict.copy()
+    policy_dict["limits"] = dict(policy_dict["limits"])
+    policy_dict["limits"]["max_output_bytes"] = 8
+    guard = ToolSafetyGuard(load_safety_policy_dict(policy_dict))
+
+    class FakeInput:
+        code_blocks = [type("Block", (), {"code": "print('hi')"})()]
+
+    class FakeExecutor:
+        async def execute_code(self, inp):
+            return {"outcome": "SUCCESS", "output": "x" * 32}
+
+    wrapped = SafetyCheckedExecutor(guard, FakeExecutor(),
+                                    audit_sink=InMemoryAuditSink())
+    result = asyncio.run(wrapped.execute_code(FakeInput()))  # noqa: F821
+    assert len(result["output"].encode("utf-8")) <= 8
 
 
 # Need asyncio.run helper
