@@ -3,7 +3,7 @@
 Usage::
 
     python scripts/tool_safety_check.py \\
-        --policy examples/tool_safety/tool_safety_policy.yaml \\
+        --policy tool/safety/examples/tool_safety_policy.yaml \\
         --language python \\
         --script-file path/to/script.py \\
         --tool-name demo

@@ -11,7 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI = REPO_ROOT / "scripts" / "tool_safety_check.py"
-POLICY = REPO_ROOT / "examples" / "tool_safety" / "tool_safety_policy.yaml"
+POLICY = REPO_ROOT / "tool" / "safety" / "examples" / "tool_safety_policy.yaml"
 
 
 def _run_cli(*args: str) -> tuple[int, str, str]:
@@ -52,11 +52,15 @@ def test_review_exit_3():
 
 
 def test_invalid_policy_exit_4(tmp_path):
-    cmd = [sys.executable, str(CLI), "--policy",
-           str(tmp_path / "missing.yaml"), "--script", "print(1)"]
+    missing_policy = tmp_path / "missing.yaml"
+    cmd = [sys.executable, str(CLI), "--policy", str(missing_policy),
+           "--script", "print(1)"]
     proc = subprocess.run(cmd, capture_output=True, text=True,
                           cwd=str(REPO_ROOT))
     assert proc.returncode == 4
+    assert "policy error:" in proc.stderr
+    assert str(missing_policy) in proc.stderr
+    assert proc.stdout == ""
 
 
 def test_required_audit_failure_exits_4(tmp_path):
@@ -70,7 +74,7 @@ def test_required_audit_failure_exits_4(tmp_path):
 
 
 def test_manifest_writes_output(tmp_path):
-    manifest = REPO_ROOT / "examples" / "tool_safety" / "samples" / "manifest.yaml"
+    manifest = REPO_ROOT / "tool" / "safety" / "examples" / "samples" / "manifest.yaml"
     output = tmp_path / "out.json"
     audit = tmp_path / "audit.jsonl"
     cmd = [sys.executable, str(CLI), "--policy", str(POLICY),

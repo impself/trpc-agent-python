@@ -1,7 +1,7 @@
 """Integration tests: manifest samples must match expected decisions.
 
 These tests verify the public manifest in
-``examples/tool_safety/samples/manifest.yaml``. Per the issue acceptance
+``tool/safety/examples/samples/manifest.yaml``. Per the issue acceptance
 criteria: every sample must produce a structured report, high-risk
 detection must be >= 90%, safe false positives <= 10%, and the
 key-credential-delete-non-allowlist categories must be 100%.
@@ -20,8 +20,8 @@ from tool.safety._policy import load_safety_policy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-POLICY_PATH = REPO_ROOT / "examples" / "tool_safety" / "tool_safety_policy.yaml"
-MANIFEST_PATH = REPO_ROOT / "examples" / "tool_safety" / "samples" / "manifest.yaml"
+POLICY_PATH = REPO_ROOT / "tool" / "safety" / "examples" / "tool_safety_policy.yaml"
+MANIFEST_PATH = REPO_ROOT / "tool" / "safety" / "examples" / "samples" / "manifest.yaml"
 
 
 @pytest.fixture(scope="module")

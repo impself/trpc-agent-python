@@ -53,9 +53,9 @@ span 属性/指标输出。
 
 ```bash
 python scripts/tool_safety_check.py \
-    --policy examples/tool_safety/tool_safety_policy.yaml \
+    --policy tool/safety/examples/tool_safety_policy.yaml \
     --language python \
-    --script-file examples/tool_safety/samples/03_dangerous_delete.py \
+    --script-file tool/safety/examples/samples/03_dangerous_delete.py \
     --output tool_safety_report.json \
     --audit-file tool_safety_audit.jsonl
 echo $?  # 0=allow, 2=deny, 3=review, 4=输入/策略/必需审计错误
@@ -65,10 +65,10 @@ echo $?  # 0=allow, 2=deny, 3=review, 4=输入/策略/必需审计错误
 
 ```bash
 python scripts/tool_safety_check.py \
-    --policy examples/tool_safety/tool_safety_policy.yaml \
-    --manifest examples/tool_safety/samples/manifest.yaml \
-    --manifest-output examples/tool_safety/manifest_run.json \
-    --audit-file examples/tool_safety/tool_safety_audit.jsonl
+    --policy tool/safety/examples/tool_safety_policy.yaml \
+    --manifest tool/safety/examples/samples/manifest.yaml \
+    --manifest-output tool/safety/examples/manifest_run.json \
+    --audit-file tool/safety/examples/tool_safety_audit.jsonl
 ```
 
 ## 作为库使用
@@ -81,7 +81,7 @@ from tool.safety import (
     ScriptLanguage,
 )
 
-policy = load_safety_policy("examples/tool_safety/tool_safety_policy.yaml")
+policy = load_safety_policy("tool/safety/examples/tool_safety_policy.yaml")
 guard = ToolSafetyGuard(policy)
 
 request = SafetyScanRequest(
@@ -351,7 +351,7 @@ tool/
 scripts/
   tool_safety_check.py          # CLI
 tests/tool_safety/              # 安全检查器测试
-examples/tool_safety/           # 策略、14 个样例、报告和审计样例
+tool/safety/examples/           # 策略、14 个样例、报告和审计样例
 docs/
   tool_safety_guard.md          # English version
   tool_safety_guard.zh_CN.md    # 本文
