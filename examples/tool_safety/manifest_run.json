@@ -1,0 +1,172 @@
+[
+  {
+    "name": "safe_python",
+    "expected_decision": "allow",
+    "actual_decision": "allow",
+    "rule_ids": [
+      "SAFE000"
+    ],
+    "report_id": "rep-61e0c448ab064221",
+    "risk_level": "info",
+    "duration_ms": 0.38300000596791506,
+    "matches_expected": true
+  },
+  {
+    "name": "safe_bash",
+    "expected_decision": "allow",
+    "actual_decision": "allow",
+    "rule_ids": [
+      "SAFE000"
+    ],
+    "report_id": "rep-b583bba1bb944efe",
+    "risk_level": "info",
+    "duration_ms": 0.5827000131830573,
+    "matches_expected": true
+  },
+  {
+    "name": "dangerous_recursive_delete",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "FILE001_RECURSIVE_DELETE"
+    ],
+    "report_id": "rep-3b18c79ff0f6402d",
+    "risk_level": "critical",
+    "duration_ms": 0.41360000614076853,
+    "matches_expected": true
+  },
+  {
+    "name": "read_ssh_key",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "FILE003_CREDENTIAL_READ"
+    ],
+    "report_id": "rep-72ef7681f35b46b3",
+    "risk_level": "critical",
+    "duration_ms": 0.5028999876230955,
+    "matches_expected": true
+  },
+  {
+    "name": "non_allowlist_network",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "NET001_DOMAIN_NOT_ALLOWED"
+    ],
+    "report_id": "rep-f005efced1e9411e",
+    "risk_level": "high",
+    "duration_ms": 0.4389999667182565,
+    "matches_expected": true
+  },
+  {
+    "name": "allowlist_network",
+    "expected_decision": "allow",
+    "actual_decision": "allow",
+    "rule_ids": [
+      "SAFE000"
+    ],
+    "report_id": "rep-459b750a8a6e4dc6",
+    "risk_level": "info",
+    "duration_ms": 0.4502000520005822,
+    "matches_expected": true
+  },
+  {
+    "name": "allowed_subprocess",
+    "expected_decision": "allow",
+    "actual_decision": "allow",
+    "rule_ids": [
+      "SAFE000"
+    ],
+    "report_id": "rep-04b3b962abcb4bbf",
+    "risk_level": "info",
+    "duration_ms": 0.45489997137337923,
+    "matches_expected": true
+  },
+  {
+    "name": "shell_injection",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "PROC002_SHELL_INJECTION",
+      "PROC003_SHELL_OPERATOR"
+    ],
+    "report_id": "rep-f5144163c5094313",
+    "risk_level": "critical",
+    "duration_ms": 0.6623999215662479,
+    "matches_expected": true
+  },
+  {
+    "name": "dependency_install",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "DEP001_ENV_MUTATION",
+      "PROC001_PROCESS_EXEC"
+    ],
+    "report_id": "rep-ccf3e7dc48844c75",
+    "risk_level": "high",
+    "duration_ms": 0.4143000114709139,
+    "matches_expected": true
+  },
+  {
+    "name": "infinite_loop",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "RES001_UNBOUNDED_LOOP"
+    ],
+    "report_id": "rep-9b522b25146b4786",
+    "risk_level": "high",
+    "duration_ms": 0.33549999352544546,
+    "matches_expected": true
+  },
+  {
+    "name": "secret_output",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "SECRET001_LOG_SINK"
+    ],
+    "report_id": "rep-e5a7cebdfabb441f",
+    "risk_level": "high",
+    "duration_ms": 0.3730000462383032,
+    "matches_expected": true
+  },
+  {
+    "name": "bash_pipeline",
+    "expected_decision": "needs_human_review",
+    "actual_decision": "needs_human_review",
+    "rule_ids": [
+      "PROC003_SHELL_OPERATOR"
+    ],
+    "report_id": "rep-b985c3c2d76b43bb",
+    "risk_level": "medium",
+    "duration_ms": 0.2604000037536025,
+    "matches_expected": true
+  },
+  {
+    "name": "read_dotenv",
+    "expected_decision": "deny",
+    "actual_decision": "deny",
+    "rule_ids": [
+      "FILE004_DOTENV_READ"
+    ],
+    "report_id": "rep-715ec01c675147f4",
+    "risk_level": "high",
+    "duration_ms": 0.278900028206408,
+    "matches_expected": true
+  },
+  {
+    "name": "dynamic_command_review",
+    "expected_decision": "needs_human_review",
+    "actual_decision": "needs_human_review",
+    "rule_ids": [
+      "PROC001_PROCESS_EXEC"
+    ],
+    "report_id": "rep-fb58b8d8e8764943",
+    "risk_level": "medium",
+    "duration_ms": 0.48740010242909193,
+    "matches_expected": true
+  }
+]
