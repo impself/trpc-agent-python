@@ -25,7 +25,8 @@ from trpc_agent_sdk.tools.safety._models import SafetyAuditEvent
 class AuditSink(Protocol):
     """Async protocol. ``emit`` must not raise except for audit errors."""
 
-    async def emit(self, event: SafetyAuditEvent) -> None: ...
+    async def emit(self, event: SafetyAuditEvent) -> None:
+        ...
 
 
 class InMemoryAuditSink:
@@ -68,15 +69,15 @@ class JsonlAuditSink:
 
     async def emit(self, event: SafetyAuditEvent) -> None:
         payload = json.dumps(
-            event.model_dump(mode="json"), sort_keys=True,
-            separators=(",", ":"), ensure_ascii=False,
+            event.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
         ) + "\n"
         try:
             await asyncio.to_thread(self._write, payload)
         except OSError as exc:
-            raise SafetyAuditError(
-                f"failed to write audit event to {self._path}: {exc}"
-            ) from exc
+            raise SafetyAuditError(f"failed to write audit event to {self._path}: {exc}") from exc
 
     def _write(self, payload: str) -> None:
         with self._thread_lock:

@@ -204,14 +204,12 @@ class SafetyReport(BaseModel):
                 report_id=report_id,
                 decision=SafetyDecision.ALLOW,
                 risk_level=RiskLevel.INFO,
-                rule_ids=(SAFE_RULE_ID,),
+                rule_ids=(SAFE_RULE_ID, ),
                 findings=(),
                 recommendation="No safety rules matched.",
                 policy_hash=policy_hash,
                 policy_version=policy_version,
-                script_sha256=hashlib.sha256(
-                    "\n".join(script_hashes).encode("utf-8", errors="ignore")
-                ).hexdigest(),
+                script_sha256=hashlib.sha256("\n".join(script_hashes).encode("utf-8", errors="ignore")).hexdigest(),
                 scan_duration_ms=scan_duration_ms,
                 redacted=False,
             )
@@ -224,9 +222,7 @@ class SafetyReport(BaseModel):
             recommendation=recommendation,
             policy_hash=policy_hash,
             policy_version=policy_version,
-            script_sha256=hashlib.sha256(
-                "\n".join(script_hashes).encode("utf-8", errors="ignore")
-            ).hexdigest(),
+            script_sha256=hashlib.sha256("\n".join(script_hashes).encode("utf-8", errors="ignore")).hexdigest(),
             scan_duration_ms=scan_duration_ms,
             redacted=any_redacted,
         )
@@ -288,9 +284,7 @@ def _stable_rule_ids(findings: list[SafetyFinding]) -> tuple[str, ...]:
     return tuple(sorted({f.rule_id for f in findings}))
 
 
-def _aggregate_recommendation(
-    findings: list[SafetyFinding], decision: SafetyDecision
-) -> str:
+def _aggregate_recommendation(findings: list[SafetyFinding], decision: SafetyDecision) -> str:
     if not findings:
         return "No safety rules matched."
     if decision == SafetyDecision.DENY:

@@ -16,39 +16,32 @@ from trpc_agent_sdk.tools.safety._models import EVIDENCE_MAX_CHARS, Evidence, Sc
 # Patterns for common secret formats. Order matters: longer/more specific
 # patterns first so their redaction wins over generic ones.
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("private_key_block", re.compile(
-        r"-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----"
-        r".*?-----END (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----",
-        re.DOTALL | re.IGNORECASE,
-    )),
+    ("private_key_block",
+     re.compile(
+         r"-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----"
+         r".*?-----END (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----",
+         re.DOTALL | re.IGNORECASE,
+     )),
     ("bearer_token", re.compile(
-        r"\b(?:Bearer|Token)\s+[A-Za-z0-9._\-+/=]{8,}", re.IGNORECASE,
+        r"\b(?:Bearer|Token)\s+[A-Za-z0-9._\-+/=]{8,}",
+        re.IGNORECASE,
     )),
-    ("api_key_slash", re.compile(
-        r"\bsk-[A-Za-z0-9]{16,}\b",
-    )),
-    ("aws_access_key", re.compile(
-        r"\bAKIA[0-9A-Z]{16}\b",
-    )),
+    ("api_key_slash", re.compile(r"\bsk-[A-Za-z0-9]{16,}\b", )),
+    ("aws_access_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b", )),
     ("aws_secret_key", re.compile(
         r"\b(?:aws_|aws_secret_access_key\s*[:=]\s*)[A-Za-z0-9/+=]{40}\b",
         re.IGNORECASE,
     )),
-    ("jwt", re.compile(
-        r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b",
-    )),
-    ("github_token", re.compile(
-        r"\b(?:gh[ps]_|github_pat_)[A-Za-z0-9]{16,}\b",
-    )),
-    ("generic_password_assign", re.compile(
-        r"(?P<key>password|passwd|pwd|secret|api[_-]?key|access[_-]?token)"
-        r"\s*[:=]\s*[\"\']?"
-        r"(?P<value>[^\"\'\s,;)}\]]{4,})",
-        re.IGNORECASE,
-    )),
-    ("hex_secret_32", re.compile(
-        r"\b[0-9a-fA-F]{32,64}\b",
-    )),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b", )),
+    ("github_token", re.compile(r"\b(?:gh[ps]_|github_pat_)[A-Za-z0-9]{16,}\b", )),
+    ("generic_password_assign",
+     re.compile(
+         r"(?P<key>password|passwd|pwd|secret|api[_-]?key|access[_-]?token)"
+         r"\s*[:=]\s*[\"\']?"
+         r"(?P<value>[^\"\'\s,;)}\]]{4,})",
+         re.IGNORECASE,
+     )),
+    ("hex_secret_32", re.compile(r"\b[0-9a-fA-F]{32,64}\b", )),
 )
 
 _PLACEHOLDER = "<REDACTED:{kind}:{digest}>"
@@ -68,8 +61,7 @@ class Redactor:
     the value itself.
     """
 
-    def __init__(self, env_values: Iterable[str] = (), *,
-                 evidence_max_chars: int = EVIDENCE_MAX_CHARS) -> None:
+    def __init__(self, env_values: Iterable[str] = (), *, evidence_max_chars: int = EVIDENCE_MAX_CHARS) -> None:
         self._evidence_max_chars = max(0, evidence_max_chars)
         # Sort longer first so we replace the longest secrets before shorter
         # substrings of the same value can match.
@@ -107,7 +99,7 @@ class Redactor:
         if len(text) <= self._evidence_max_chars:
             return text
         if self._evidence_max_chars <= 16:
-            return text[: self._evidence_max_chars]
+            return text[:self._evidence_max_chars]
         keep = self._evidence_max_chars - 5
         head = keep // 2
         tail = keep - head
@@ -124,8 +116,7 @@ class Redactor:
     ) -> Evidence:
         """Build a fully redacted, bounded :class:`Evidence`."""
 
-        clean_extras = {k: self.truncate(self.redact(str(v)))
-                        for k, v in (extras or {}).items()}
+        clean_extras = {k: self.truncate(self.redact(str(v))) for k, v in (extras or {}).items()}
         return Evidence(
             snippet=self.truncate(self.redact(snippet)),
             line=max(0, int(line or 0)),
@@ -136,6 +127,7 @@ class Redactor:
 
 
 def _apply_pattern(text: str, kind: str, pattern: re.Pattern[str]) -> str:
+
     def _sub(match: re.Match[str]) -> str:
         if "value" in match.groupdict():
             value = match.group("value")
@@ -158,8 +150,7 @@ def contains_secret_literal(value: str) -> bool:
     blocked as a potential leak is guaranteed to be redacted in its evidence.
     """
 
-    return any(pattern.search(value) is not None
-               for _, pattern in _SECRET_PATTERNS)
+    return any(pattern.search(value) is not None for _, pattern in _SECRET_PATTERNS)
 
 
 def evidence_was_redacted(evidence: Evidence) -> bool:
@@ -167,8 +158,7 @@ def evidence_was_redacted(evidence: Evidence) -> bool:
 
     if _REDACTION_MARKER in evidence.snippet:
         return True
-    return any(_REDACTION_MARKER in value
-               for value in evidence.extras.values())
+    return any(_REDACTION_MARKER in value for value in evidence.extras.values())
 
 
 def make_default_redactor(env_values: Iterable[str] = ()) -> Redactor:

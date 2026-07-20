@@ -12,7 +12,6 @@ from typing import Any
 
 from trpc_agent_sdk.tools.safety._models import SafetyAuditEvent, SafetyReport
 
-
 _SPAN_ATTRS = (
     "trpc_agent_sdk.tools.safety.decision",
     "trpc_agent_sdk.tools.safety.risk_level",
@@ -43,46 +42,42 @@ class TelemetrySink:
         self._block_counter = _safe_counter(self._meter, _METRIC_BLOCK_COUNT)
         self._histogram = _safe_histogram(self._meter, _METRIC_SCAN_DURATION)
 
-    def record(self, report: SafetyReport, *,
-               tool_name: str, blocked: bool) -> None:
+    def record(self, report: SafetyReport, *, tool_name: str, blocked: bool) -> None:
         attrs = self.attributes(report, tool_name=tool_name, blocked=blocked)
         self._emit_span_attrs(attrs)
         if self._counter is not None:
             try:
-                self._counter.add(
-                    1, {
-                        "decision": report.decision.value,
-                        "risk_level": report.risk_level.label(),
-                        "tool_name": tool_name,
-                    }
-                )
+                self._counter.add(1, {
+                    "decision": report.decision.value,
+                    "risk_level": report.risk_level.label(),
+                    "tool_name": tool_name,
+                })
             except Exception:  # pragma: no cover - defensive
                 pass
         if blocked and self._block_counter is not None:
             try:
                 primary = report.rule_ids[0] if report.rule_ids else ""
-                self._block_counter.add(
-                    1, {
-                        "decision": report.decision.value,
-                        "rule_id": primary,
-                        "tool_name": tool_name,
-                    }
-                )
+                self._block_counter.add(1, {
+                    "decision": report.decision.value,
+                    "rule_id": primary,
+                    "tool_name": tool_name,
+                })
             except Exception:  # pragma: no cover - defensive
                 pass
         if self._histogram is not None:
             try:
                 self._histogram.record(
                     report.scan_duration_ms,
-                    {"decision": report.decision.value,
-                     "tool_name": tool_name},
+                    {
+                        "decision": report.decision.value,
+                        "tool_name": tool_name
+                    },
                 )
             except Exception:  # pragma: no cover - defensive
                 pass
 
     @staticmethod
-    def attributes(report: SafetyReport, *,
-                   tool_name: str, blocked: bool) -> dict[str, Any]:
+    def attributes(report: SafetyReport, *, tool_name: str, blocked: bool) -> dict[str, Any]:
         """Return the span attribute dict for a report.
 
         ``rule_id`` is joined into a bounded comma-separated string (the

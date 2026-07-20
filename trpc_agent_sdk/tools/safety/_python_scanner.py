@@ -40,37 +40,33 @@ from trpc_agent_sdk.tools.safety._rules import _LanguageScannerRule, SafetyRule
 from trpc_agent_sdk.tools.safety._policy import is_sensitive_env_key
 from trpc_agent_sdk.tools.safety._redaction import contains_secret_literal
 
-
 # Networks libs and the attribute used to extract a host arg.
 _NETWORK_LIBS: dict[str, tuple[str, ...]] = {
-    "requests": ("get", "post", "put", "delete", "patch", "head",
-                 "options", "request"),
-    "aiohttp": ("get", "post", "put", "delete", "patch", "head",
-                "options", "request", "ClientSession"),
-    "httpx": ("get", "post", "put", "delete", "patch", "head",
-              "options", "request", "Client"),
+    "requests": ("get", "post", "put", "delete", "patch", "head", "options", "request"),
+    "aiohttp": ("get", "post", "put", "delete", "patch", "head", "options", "request", "ClientSession"),
+    "httpx": ("get", "post", "put", "delete", "patch", "head", "options", "request", "Client"),
     "urllib.request": ("urlopen", "urlretrieve", "Request"),
-    "urllib": ("urlopen",),
+    "urllib": ("urlopen", ),
     "http.client": ("HTTPConnection", "HTTPSConnection"),
-    "websocket": ("create_connection",),
+    "websocket": ("create_connection", ),
     "socket": ("socket", "connect", "create_connection"),
 }
 
 _PRIVILEGE_COMMANDS = {"sudo", "su", "doas", "pkexec"}
 
 _PACKAGE_MANAGERS = {
-    "pip": ("install",),
-    "pip3": ("install",),
+    "pip": ("install", ),
+    "pip3": ("install", ),
     "python": (),  # special-cased with -m pip
     "npm": ("install", "i", "add"),
     "yarn": ("add", "install"),
     "pnpm": ("add", "install"),
-    "apt": ("install",),
-    "apt-get": ("install",),
-    "apk": ("add",),
-    "yum": ("install",),
-    "dnf": ("install",),
-    "brew": ("install",),
+    "apt": ("install", ),
+    "apt-get": ("install", ),
+    "apk": ("add", ),
+    "yum": ("install", ),
+    "dnf": ("install", ),
+    "brew": ("install", ),
     "conda": ("install", "create"),
 }
 
@@ -85,10 +81,10 @@ _SECRET_SOURCE_NAMES = {
     "getenv",
 }
 
-
 # --------------------------------------------------------------------------- #
 # Source helpers
 # --------------------------------------------------------------------------- #
+
 
 def _src_segment(source: str, node: ast.AST) -> str:
     """Best-effort source segment for a node."""
@@ -147,6 +143,7 @@ def _format_string(node: ast.AST) -> str | None:
 # Scanner
 # --------------------------------------------------------------------------- #
 
+
 class _PythonScanner:
     """Walks the AST once and collects facts."""
 
@@ -180,11 +177,12 @@ class _PythonScanner:
         try:
             self.tree = ast.parse(self.source)
         except SyntaxError as exc:
-            self.parse_errors.append(ParseErrorFact(
-                snippet="",
-                loc=Loc(line=exc.lineno or 0, column=exc.offset or 0),
-                message=f"SyntaxError: {exc.msg}",
-            ))
+            self.parse_errors.append(
+                ParseErrorFact(
+                    snippet="",
+                    loc=Loc(line=exc.lineno or 0, column=exc.offset or 0),
+                    message=f"SyntaxError: {exc.msg}",
+                ))
 
     def scan(self) -> ScriptFacts:
         if self.tree is None:
@@ -226,8 +224,7 @@ class _PythonScanner:
     def _is_path_construction(self, node: ast.AST) -> bool:
         if isinstance(node, ast.Call):
             canonical = self._canonical_name(node.func)
-            return canonical in {"pathlib.Path", "Path", "PosixPath",
-                                 "pathlib.PurePath", "pathlib.PurePosixPath"}
+            return canonical in {"pathlib.Path", "Path", "PosixPath", "pathlib.PurePath", "pathlib.PurePosixPath"}
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
             return True
         return False
@@ -268,8 +265,7 @@ class _PythonScanner:
                 key = _const_str(arg) or "<dynamic>"
                 return f"env:{key}"
             # open(..., "r") on credential path
-            if canonical in ("open", "io.open", "pathlib.Path.open",
-                              "codecs.open"):
+            if canonical in ("open", "io.open", "pathlib.Path.open", "codecs.open"):
                 kind = self._credential_kind_for_open(node)
                 if kind:
                     return f"file:{kind}"
@@ -308,20 +304,16 @@ class _PythonScanner:
         if canonical in {"os.remove", "os.unlink"}:
             self.file_deletes.append(self._file_delete(node, recursive=False))
             return
-        if canonical in {"os.rmdir", "pathlib.Path.rmdir",
-                         "pathlib.Path.unlink"}:
+        if canonical in {"os.rmdir", "pathlib.Path.rmdir", "pathlib.Path.unlink"}:
             self.file_deletes.append(self._file_delete(node, recursive=False))
             return
         if canonical == "shutil.rmtree":
             self.file_deletes.append(self._file_delete(node, recursive=True))
             return
-        if canonical in {"pathlib.Path.write_text",
-                         "pathlib.Path.write_bytes"}:
+        if canonical in {"pathlib.Path.write_text", "pathlib.Path.write_bytes"}:
             self.file_writes.append(self._pathlib_write(node, canonical))
             return
-        if canonical in {"pathlib.Path.read_text",
-                         "pathlib.Path.read_bytes",
-                         "pathlib.Path.read"}:
+        if canonical in {"pathlib.Path.read_text", "pathlib.Path.read_bytes", "pathlib.Path.read"}:
             self._handle_pathlib_read(node)
             return
         # Fallback for ``path.read_text()`` where ``path`` is a local alias
@@ -332,8 +324,7 @@ class _PythonScanner:
                 and node.func.value.id in self._path_aliases:
             self._handle_pathlib_read(node)
             return
-        if canonical in {"open", "io.open", "codecs.open",
-                         "pathlib.Path.open"}:
+        if canonical in {"open", "io.open", "codecs.open", "pathlib.Path.open"}:
             self._handle_open(node)
             return
 
@@ -347,19 +338,20 @@ class _PythonScanner:
 
         # 4) Dynamic exec
         if canonical in {"eval", "exec", "compile"}:
-            self.dynamic_execs.append(DynamicExecFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                kind=canonical.split(".")[-1],
-            ))
+            self.dynamic_execs.append(
+                DynamicExecFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    kind=canonical.split(".")[-1],
+                ))
             return
-        if canonical in {"importlib.import_module",
-                         "importlib.__import__", "__import__"}:
-            self.dynamic_execs.append(DynamicExecFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                kind="dynamic_import",
-            ))
+        if canonical in {"importlib.import_module", "importlib.__import__", "__import__"}:
+            self.dynamic_execs.append(
+                DynamicExecFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    kind="dynamic_import",
+                ))
             return
         if canonical == "getattr":
             # getattr(os, "system") -- only flag when the attribute name
@@ -367,11 +359,12 @@ class _PythonScanner:
             if len(node.args) >= 2:
                 attr = _const_str(node.args[1])
                 if attr in {"system", "popen", "exec", "eval", "fork"}:
-                    self.dynamic_execs.append(DynamicExecFact(
-                        snippet=_src_segment(self.source, node),
-                        loc=_loc(node),
-                        kind=f"getattr:{attr}",
-                    ))
+                    self.dynamic_execs.append(
+                        DynamicExecFact(
+                            snippet=_src_segment(self.source, node),
+                            loc=_loc(node),
+                            kind=f"getattr:{attr}",
+                        ))
             return
 
         # 5) Sleep
@@ -440,24 +433,26 @@ class _PythonScanner:
                 mode = arg.value
                 break
         if any(ch in mode for ch in ("w", "a", "x", "+")):
-            self.file_writes.append(FileWriteFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                target=target,
-                mode=mode,
-                explicit=explicit,
-            ))
+            self.file_writes.append(
+                FileWriteFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    target=target,
+                    mode=mode,
+                    explicit=explicit,
+                ))
         else:
             kind = self._credential_kind_for_str(target) or "regular"
             if target.lower().endswith(".env") or ".env" in target.lower():
                 kind = "dotenv"
-            self.file_reads.append(FileReadFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                target=target,
-                kind=kind,
-                explicit=explicit,
-            ))
+            self.file_reads.append(
+                FileReadFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    target=target,
+                    kind=kind,
+                    explicit=explicit,
+                ))
 
     def _handle_pathlib_read(self, node: ast.Call) -> None:
         """Handle ``Path(...).read_text()`` / ``read_bytes()``."""
@@ -498,13 +493,14 @@ class _PythonScanner:
         kind = self._credential_kind_for_str(target) or "regular"
         if target.lower().endswith(".env") or ".env" in target.lower():
             kind = "dotenv"
-        self.file_reads.append(FileReadFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            target=target,
-            kind=kind,
-            explicit=explicit,
-        ))
+        self.file_reads.append(
+            FileReadFact(
+                snippet=_src_segment(self.source, node),
+                loc=_loc(node),
+                target=target,
+                kind=kind,
+                explicit=explicit,
+            ))
 
     def _collect_path_chain(self, node: ast.AST) -> str:
         """Flatten ``Path(a) / "b" / "c"`` into ``<dynamic>/b/c``."""
@@ -515,8 +511,7 @@ class _PythonScanner:
             return ""
         return "/".join(parts)
 
-    def _walk_path_chain(self, node: ast.AST | None,
-                         parts: list[str]) -> None:
+    def _walk_path_chain(self, node: ast.AST | None, parts: list[str]) -> None:
         if node is None:
             return
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
@@ -525,8 +520,7 @@ class _PythonScanner:
             return
         if isinstance(node, ast.Call):
             canonical = self._canonical_name(node.func)
-            if canonical in {"pathlib.Path", "Path", "PosixPath",
-                             "pathlib.PurePath", "pathlib.PurePosixPath"}:
+            if canonical in {"pathlib.Path", "Path", "PosixPath", "pathlib.PurePath", "pathlib.PurePosixPath"}:
                 if node.args:
                     arg_text = _const_str(node.args[0]) \
                         or _format_string(node.args[0])
@@ -580,22 +574,24 @@ class _PythonScanner:
             # Couldn't find a literal and not flagged dynamic -- still
             # record as dynamic so the call doesn't disappear silently.
             dynamic = True
-        self.network_calls.append(NetworkFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            target=target or "",
-            library=library_name,
-            dynamic=dynamic,
-        ))
-        # Secret flow: tainted value flows into params/data/headers.
-        if self._tainted_flows_into_call(node):
-            self.secret_flows.append(SecretFlowFact(
+        self.network_calls.append(
+            NetworkFact(
                 snippet=_src_segment(self.source, node),
                 loc=_loc(node),
-                source="<tainted>",
-                sink=canonical,
-                sink_kind="network",
+                target=target or "",
+                library=library_name,
+                dynamic=dynamic,
             ))
+        # Secret flow: tainted value flows into params/data/headers.
+        if self._tainted_flows_into_call(node):
+            self.secret_flows.append(
+                SecretFlowFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    source="<tainted>",
+                    sink=canonical,
+                    sink_kind="network",
+                ))
         return True
 
     def _extract_network_target(self, node: ast.Call) -> tuple[str | None, bool]:
@@ -624,9 +620,10 @@ class _PythonScanner:
     # ----- process / subprocess ----- #
 
     def _handle_process_call(self, node: ast.Call, canonical: str) -> bool:
-        if canonical in {"subprocess.run", "subprocess.Popen",
-                         "subprocess.call", "subprocess.check_call",
-                         "subprocess.check_output"}:
+        if canonical in {
+                "subprocess.run", "subprocess.Popen", "subprocess.call", "subprocess.check_call",
+                "subprocess.check_output"
+        }:
             self._record_subprocess(node, canonical)
             return True
         if canonical in {"os.system", "os.popen"}:
@@ -643,56 +640,61 @@ class _PythonScanner:
             if kw.arg == "shell" and isinstance(kw.value, ast.Constant):
                 shell = bool(kw.value.value)
         command_str, has_operators, dynamic = self._subprocess_command(node)
-        self.process_calls.append(ProcessFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            command=command_str,
-            shell=shell if shell else None,
-            has_operators=has_operators,
-        ))
+        self.process_calls.append(
+            ProcessFact(
+                snippet=_src_segment(self.source, node),
+                loc=_loc(node),
+                command=command_str,
+                shell=shell if shell else None,
+                has_operators=has_operators,
+            ))
         # Privilege / dependency inspection
         self._maybe_record_special_command(command_str, node, dynamic)
         if shell:
-            self.shell_operators.append(ShellOperatorFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                operator="shell=True",
-            ))
+            self.shell_operators.append(
+                ShellOperatorFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    operator="shell=True",
+                ))
         if self._tainted_flows_into_call(node):
-            self.secret_flows.append(SecretFlowFact(
+            self.secret_flows.append(
+                SecretFlowFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    source="<tainted>",
+                    sink=canonical,
+                    sink_kind="subprocess",
+                ))
+
+    def _record_system_call(self, node: ast.Call, canonical: str, *, shell: bool) -> None:
+        command_str, has_operators, dynamic = self._subprocess_command(node)
+        self.process_calls.append(
+            ProcessFact(
                 snippet=_src_segment(self.source, node),
                 loc=_loc(node),
-                source="<tainted>",
-                sink=canonical,
-                sink_kind="subprocess",
+                command=command_str,
+                shell=shell,
+                has_operators=has_operators,
             ))
-
-    def _record_system_call(self, node: ast.Call, canonical: str,
-                            *, shell: bool) -> None:
-        command_str, has_operators, dynamic = self._subprocess_command(node)
-        self.process_calls.append(ProcessFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            command=command_str,
-            shell=shell,
-            has_operators=has_operators,
-        ))
         self._maybe_record_special_command(command_str, node, dynamic)
         if has_operators:
             for op in _SHELL_OPERATORS_IN(command_str):
-                self.shell_operators.append(ShellOperatorFact(
+                self.shell_operators.append(
+                    ShellOperatorFact(
+                        snippet=_src_segment(self.source, node),
+                        loc=_loc(node),
+                        operator=op,
+                    ))
+        if self._tainted_flows_into_call(node):
+            self.secret_flows.append(
+                SecretFlowFact(
                     snippet=_src_segment(self.source, node),
                     loc=_loc(node),
-                    operator=op,
+                    source="<tainted>",
+                    sink=canonical,
+                    sink_kind="subprocess",
                 ))
-        if self._tainted_flows_into_call(node):
-            self.secret_flows.append(SecretFlowFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                source="<tainted>",
-                sink=canonical,
-                sink_kind="subprocess",
-            ))
 
     def _subprocess_command(self, node: ast.Call) -> tuple[str, bool, bool]:
         """Return (command_text, has_shell_operators, dynamic)."""
@@ -714,9 +716,7 @@ class _PythonScanner:
         # Dynamic construction
         return ("", False, True)
 
-    def _maybe_record_special_command(self, command_str: str,
-                                      node: ast.Call,
-                                      dynamic: bool) -> None:
+    def _maybe_record_special_command(self, command_str: str, node: ast.Call, dynamic: bool) -> None:
         if dynamic or not command_str:
             return
         tokens = command_str.split()
@@ -724,11 +724,12 @@ class _PythonScanner:
             return
         executable = tokens[0].lower()
         if executable in _PRIVILEGE_COMMANDS:
-            self.privilege_commands.append(PrivilegeFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                command=executable,
-            ))
+            self.privilege_commands.append(
+                PrivilegeFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    command=executable,
+                ))
         # pip install / npm install / apt install / ...
         if executable in _PACKAGE_MANAGERS:
             install_subcommands = _PACKAGE_MANAGERS[executable]
@@ -738,21 +739,23 @@ class _PythonScanner:
                         and tokens[idx] in {"pip", "pip3"} \
                         and idx + 1 < len(tokens) \
                         and tokens[idx + 1] == "install":
-                    self.dependency_installs.append(DependencyInstallFact(
-                        snippet=_src_segment(self.source, node),
-                        loc=_loc(node),
-                        manager=tokens[idx],
-                        command=" ".join(tokens[idx:]),
-                    ))
+                    self.dependency_installs.append(
+                        DependencyInstallFact(
+                            snippet=_src_segment(self.source, node),
+                            loc=_loc(node),
+                            manager=tokens[idx],
+                            command=" ".join(tokens[idx:]),
+                        ))
                     return
             if install_subcommands and len(tokens) >= 2 \
                     and tokens[1] in install_subcommands:
-                self.dependency_installs.append(DependencyInstallFact(
-                    snippet=_src_segment(self.source, node),
-                    loc=_loc(node),
-                    manager=executable,
-                    command=command_str,
-                ))
+                self.dependency_installs.append(
+                    DependencyInstallFact(
+                        snippet=_src_segment(self.source, node),
+                        loc=_loc(node),
+                        manager=executable,
+                        command=command_str,
+                    ))
 
     # ----- sleep ----- #
 
@@ -766,35 +769,37 @@ class _PythonScanner:
                 raw = str(arg.value)
             else:
                 raw = _src_segment(self.source, arg)
-        self.long_sleeps.append(LongSleepFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            duration_seconds=duration,
-            raw=raw,
-        ))
+        self.long_sleeps.append(
+            LongSleepFact(
+                snippet=_src_segment(self.source, node),
+                loc=_loc(node),
+                duration_seconds=duration,
+                raw=raw,
+            ))
 
     # ----- concurrency ----- #
 
     def _handle_concurrency_call(self, node: ast.Call, canonical: str) -> bool:
-        if canonical in {"multiprocessing.Process",
-                         "multiprocessing.Pool",
-                         "concurrent.futures.ThreadPoolExecutor",
-                         "concurrent.futures.ProcessPoolExecutor",
-                         "threading.Thread"}:
+        if canonical in {
+                "multiprocessing.Process", "multiprocessing.Pool", "concurrent.futures.ThreadPoolExecutor",
+                "concurrent.futures.ProcessPoolExecutor", "threading.Thread"
+        }:
             count = self._static_thread_count(node)
-            self.concurrency.append(ConcurrencyFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                count=count,
-                raw=canonical,
-            ))
+            self.concurrency.append(
+                ConcurrencyFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    count=count,
+                    raw=canonical,
+                ))
             return True
         if canonical == "os.fork":
-            self.fork_bombs.append(ForkBombFact(
-                snippet=_src_segment(self.source, node),
-                loc=_loc(node),
-                pattern="os.fork",
-            ))
+            self.fork_bombs.append(
+                ForkBombFact(
+                    snippet=_src_segment(self.source, node),
+                    loc=_loc(node),
+                    pattern="os.fork",
+                ))
             return True
         return False
 
@@ -815,23 +820,22 @@ class _PythonScanner:
             sink_kind = "output"
             sink_name = canonical
         elif canonical.startswith("logging.") or canonical in {
-                "logger.info", "logger.debug", "logger.warning",
-                "logger.error", "logger.critical", "logger.log",
-                "logger.exception"}:
+                "logger.info", "logger.debug", "logger.warning", "logger.error", "logger.critical", "logger.log",
+                "logger.exception"
+        }:
             sink_kind = "output"
             sink_name = canonical
-        elif canonical in {"open", "io.open", "codecs.open",
-                           "pathlib.Path.open",
-                           "pathlib.Path.write_text",
-                           "pathlib.Path.write_bytes"}:
+        elif canonical in {
+                "open", "io.open", "codecs.open", "pathlib.Path.open", "pathlib.Path.write_text",
+                "pathlib.Path.write_bytes"
+        }:
             sink_kind = "file"
             sink_name = canonical
         # Detect calls on a local variable named ``logger``/``log`` whose
         # method is a known logging primitive.
         if sink_kind is None and isinstance(node.func, ast.Attribute):
             method = node.func.attr
-            if method in {"info", "debug", "warning", "warn",
-                           "error", "critical", "exception", "log"}:
+            if method in {"info", "debug", "warning", "warn", "error", "critical", "exception", "log"}:
                 if isinstance(node.func.value, ast.Name) \
                         and node.func.value.id.lower() in {"log", "logger",
                                                               "logging"}:
@@ -846,20 +850,22 @@ class _PythonScanner:
             size = self._static_size(node.args[-1] if node.args else None)
             if size is not None and size > 0:
                 target = _const_str(node.args[0]) if node.args else "" or "<dynamic>"
-                self.large_writes.append(LargeWriteFact(
-                    snippet=_src_segment(self.source, node),
-                    loc=_loc(node),
-                    size=size,
-                    target=target,
-                    raw=canonical,
-                ))
-        self.secret_flows.append(SecretFlowFact(
-            snippet=_src_segment(self.source, node),
-            loc=_loc(node),
-            source="<tainted>",
-            sink=sink_name or canonical,
-            sink_kind=sink_kind,  # type: ignore[arg-type]
-        ))
+                self.large_writes.append(
+                    LargeWriteFact(
+                        snippet=_src_segment(self.source, node),
+                        loc=_loc(node),
+                        size=size,
+                        target=target,
+                        raw=canonical,
+                    ))
+        self.secret_flows.append(
+            SecretFlowFact(
+                snippet=_src_segment(self.source, node),
+                loc=_loc(node),
+                source="<tainted>",
+                sink=sink_name or canonical,
+                sink_kind=sink_kind,  # type: ignore[arg-type]
+            ))
 
     # ----- loops ----- #
 
@@ -869,30 +875,33 @@ class _PythonScanner:
             if isinstance(test, ast.Constant) and test.value is True:
                 # while True with no break -> unbounded
                 if not _has_break(node):
-                    self.unbounded_loops.append(UnboundedLoopFact(
-                        snippet=_src_segment(self.source, node),
-                        loc=_loc(node),
-                        kind="while-True",
-                    ))
+                    self.unbounded_loops.append(
+                        UnboundedLoopFact(
+                            snippet=_src_segment(self.source, node),
+                            loc=_loc(node),
+                            kind="while-True",
+                        ))
                 return
             if isinstance(test, ast.Name) and test.id == "True":
                 if not _has_break(node):
-                    self.unbounded_loops.append(UnboundedLoopFact(
-                        snippet=_src_segment(self.source, node),
-                        loc=_loc(node),
-                        kind="while-True-name",
-                    ))
+                    self.unbounded_loops.append(
+                        UnboundedLoopFact(
+                            snippet=_src_segment(self.source, node),
+                            loc=_loc(node),
+                            kind="while-True-name",
+                        ))
         elif isinstance(node, ast.For):
             iter_node = node.iter
             if isinstance(iter_node, ast.Call):
                 target_name = self._canonical_name(iter_node.func)
                 if target_name in {"itertools.cycle", "iter"} \
                         and not _has_break(node):
-                    self.unbounded_loops.append(UnboundedLoopFact(
-                        snippet=_src_segment(self.source, node),
-                        loc=_loc(node),
-                        kind=target_name,
-                    ))
+                    self.unbounded_loops.append(
+                        UnboundedLoopFact(
+                            snippet=_src_segment(self.source, node),
+                            loc=_loc(node),
+                            kind=target_name,
+                        ))
 
     # ----- helpers ----- #
 
@@ -934,8 +943,7 @@ class _PythonScanner:
         if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
             return any(self._expr_tainted(e) for e in node.elts)
         if isinstance(node, ast.Dict):
-            return any(self._expr_tainted(v) for v in node.values
-                       if v is not None)
+            return any(self._expr_tainted(v) for v in node.values if v is not None)
         if isinstance(node, ast.Call):
             # open(<tainted>) etc
             return any(self._expr_tainted(a) for a in node.args)
@@ -990,6 +998,7 @@ class _PythonScanner:
 # Module-level helpers
 # --------------------------------------------------------------------------- #
 
+
 def _first_arg(call: ast.Call) -> ast.AST | None:
     return call.args[0] if call.args else None
 
@@ -1032,6 +1041,7 @@ def _SHELL_OPERATORS_IN(text: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 # Rule wrapper
 # --------------------------------------------------------------------------- #
+
 
 class PythonScannerRule(_LanguageScannerRule, SafetyRule):
     """Rule that runs the Python scanner once and evaluates the catalog."""

@@ -40,7 +40,6 @@ from trpc_agent_sdk.tools.safety._tool_adapter import (
     resolve_adapter,
 )
 
-
 # ContextVar so concurrent tool calls do not share trace state. The value
 # is the sanitized arguments to emit on the next ``trace_tool_call``.
 _trace_args_var: contextvars.ContextVar[tuple[str, ...] | None] = \
@@ -94,10 +93,8 @@ class ToolScriptSafetyFilter:
     ) -> None:
         self.guard = guard
         self.policy: ToolSafetyPolicy = guard.policy
-        self.audit_sink: AuditSink = audit_sink or (
-            NullAuditSink() if not self.policy.audit.enabled
-            else InMemoryAuditSink()
-        )
+        self.audit_sink: AuditSink = audit_sink or (NullAuditSink()
+                                                    if not self.policy.audit.enabled else InMemoryAuditSink())
         self._telemetry = telemetry
         self._builtin = builtin_adapters or build_default_adapters(self.policy)
 
@@ -119,8 +116,7 @@ class ToolScriptSafetyFilter:
         Callers that want fail-closed behavior should use ``enforce``.
         """
 
-        request = self._build_request(
-            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        request = self._build_request(tool_name, args, tool_kind=tool_kind, metadata=metadata)
         return self._run_sync(self.check_request_async(request))
 
     async def check_async(
@@ -132,18 +128,19 @@ class ToolScriptSafetyFilter:
         metadata: Mapping[str, Any] | None = None,
     ) -> tuple[SafetyDecision, SafetyReport]:
         """Async form of :meth:`check` that waits for required audit I/O."""
-        request = self._build_request(
-            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        request = self._build_request(tool_name, args, tool_kind=tool_kind, metadata=metadata)
         return await self.check_request_async(request)
 
     def check_request(
-        self, request: SafetyScanRequest,
+        self,
+        request: SafetyScanRequest,
     ) -> tuple[SafetyDecision, SafetyReport]:
         """Scan and record an already-normalized request synchronously."""
         return self._run_sync(self.check_request_async(request))
 
     async def check_request_async(
-        self, request: SafetyScanRequest,
+        self,
+        request: SafetyScanRequest,
     ) -> tuple[SafetyDecision, SafetyReport]:
         """Scan and durably record an already-normalized request."""
         report = self.guard.scan(request)
@@ -166,8 +163,7 @@ class ToolScriptSafetyFilter:
         reached.
         """
 
-        request = self._build_request(
-            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        request = self._build_request(tool_name, args, tool_kind=tool_kind, metadata=metadata)
         return self.enforce_request(request)
 
     async def enforce_async(
@@ -179,8 +175,7 @@ class ToolScriptSafetyFilter:
         metadata: Mapping[str, Any] | None = None,
     ) -> SafetyReport:
         """Async form of :meth:`enforce` for async delegates."""
-        request = self._build_request(
-            tool_name, args, tool_kind=tool_kind, metadata=metadata)
+        request = self._build_request(tool_name, args, tool_kind=tool_kind, metadata=metadata)
         return await self.enforce_request_async(request)
 
     def enforce_request(self, request: SafetyScanRequest) -> SafetyReport:
@@ -188,7 +183,8 @@ class ToolScriptSafetyFilter:
         return self._run_sync(self.enforce_request_async(request))
 
     async def enforce_request_async(
-        self, request: SafetyScanRequest,
+        self,
+        request: SafetyScanRequest,
     ) -> SafetyReport:
         """Async fail-closed form of :meth:`enforce_request`."""
         decision, report = await self.check_request_async(request)
@@ -216,8 +212,7 @@ class ToolScriptSafetyFilter:
         args = _resolve_args(req)
         tool_kind = _resolve_tool_kind(ctx, req)
         try:
-            _, report = await self.check_async(
-                tool_name, args, tool_kind=tool_kind)
+            _, report = await self.check_async(tool_name, args, tool_kind=tool_kind)
         except ToolRequestError as exc:
             request = SafetyScanRequest(
                 tool_name=tool_name,
@@ -294,12 +289,15 @@ class ToolScriptSafetyFilter:
         tool_kind: ToolKind,
         metadata: Mapping[str, Any] | None,
     ) -> SafetyScanRequest:
-        adapter = resolve_adapter(tool_name, self.policy,
-                                  builtin=self._builtin)
+        adapter = resolve_adapter(tool_name, self.policy, builtin=self._builtin)
         request = adapter.build_request(
-            args, metadata=metadata,
+            args,
+            metadata=metadata,
         ) if _looks_like_args_dict(args) else _build_request_from_raw(
-            tool_name, tool_kind, args, adapter,
+            tool_name,
+            tool_kind,
+            args,
+            adapter,
         )
         if request.tool_kind == ToolKind.UNKNOWN:
             return request.model_copy(update={"tool_kind": tool_kind})
@@ -314,18 +312,14 @@ class ToolScriptSafetyFilter:
         except RuntimeError:
             return asyncio.run(coroutine)
         coroutine.close()
-        raise SafetyAuditError(
-            "synchronous safety enforcement cannot run inside an event loop; "
-            "use the async interface so required audit I/O is awaited"
-        )
+        raise SafetyAuditError("synchronous safety enforcement cannot run inside an event loop; "
+                               "use the async interface so required audit I/O is awaited")
 
     def blocks_execution(self, report: SafetyReport) -> bool:
         """Return whether policy requires this report to block execution."""
 
-        return report.decision == SafetyDecision.DENY or (
-            report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
-            and self.policy.defaults.human_review_blocks_execution
-        )
+        return report.decision == SafetyDecision.DENY or (report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
+                                                          and self.policy.defaults.human_review_blocks_execution)
 
     def _set_trace_args(
         self,
@@ -366,8 +360,7 @@ def _build_request_from_raw(
         )
     if isinstance(args, Mapping):
         return adapter.build_request(args)
-    raise ToolRequestError(
-        f"unsupported args type {type(args)!r} for tool {tool_name!r}")
+    raise ToolRequestError(f"unsupported args type {type(args)!r} for tool {tool_name!r}")
 
 
 def _resolve_tool_name(ctx: Any, req: Any) -> str:
@@ -434,27 +427,30 @@ def _set_filter_rsp(rsp: Any, payload: Mapping[str, Any]) -> None:
 def _render_block(report: SafetyReport) -> dict[str, Any]:
     return {
         "tool_safety": {
-            "report_id": report.report_id,
-            "decision": report.decision.value,
-            "risk_level": report.risk_level.label(),
-            "rule_ids": list(report.rule_ids),
-            "recommendation": report.recommendation,
-            "policy_hash": report.policy_hash,
-            "findings": [
-                {
-                    "rule_id": f.rule_id,
-                    "category": f.category.value,
-                    "risk_level": f.risk_level.label(),
-                    "evidence": f.evidence.snippet,
-                    "location": {
-                        "line": f.evidence.line,
-                        "column": f.evidence.column,
-                    },
-                    "extras": dict(f.evidence.extras),
-                    "recommendation": f.recommendation,
-                }
-                for f in report.findings
-            ],
+            "report_id":
+            report.report_id,
+            "decision":
+            report.decision.value,
+            "risk_level":
+            report.risk_level.label(),
+            "rule_ids":
+            list(report.rule_ids),
+            "recommendation":
+            report.recommendation,
+            "policy_hash":
+            report.policy_hash,
+            "findings": [{
+                "rule_id": f.rule_id,
+                "category": f.category.value,
+                "risk_level": f.risk_level.label(),
+                "evidence": f.evidence.snippet,
+                "location": {
+                    "line": f.evidence.line,
+                    "column": f.evidence.column,
+                },
+                "extras": dict(f.evidence.extras),
+                "recommendation": f.recommendation,
+            } for f in report.findings],
         },
     }
 

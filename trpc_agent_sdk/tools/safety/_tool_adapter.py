@@ -14,12 +14,12 @@ from trpc_agent_sdk.tools.safety._exceptions import ToolRequestError
 from trpc_agent_sdk.tools.safety._models import SafetyScanRequest, ScriptLanguage, ToolKind
 from trpc_agent_sdk.tools.safety._policy import ToolFieldMapping, ToolSafetyPolicy
 
-
 # Default mappings keyed by the canonical tool name. The keys must match
 # what the framework passes as ``tool_name`` to the filter; they can be
 # overridden or extended through ``policy.tools``.
 _BUILTIN_DEFAULTS: dict[str, ToolFieldMapping] = {
-    "workspace_exec": ToolFieldMapping(
+    "workspace_exec":
+    ToolFieldMapping(
         execution_capable=True,
         language=ScriptLanguage.BASH,
         script="command",
@@ -27,7 +27,8 @@ _BUILTIN_DEFAULTS: dict[str, ToolFieldMapping] = {
         env="env",
         timeout="timeout_sec",
     ),
-    "skill_run": ToolFieldMapping(
+    "skill_run":
+    ToolFieldMapping(
         execution_capable=True,
         language=ScriptLanguage.BASH,
         script="command",
@@ -35,7 +36,8 @@ _BUILTIN_DEFAULTS: dict[str, ToolFieldMapping] = {
         env="env",
         timeout="timeout",
     ),
-    "skill_exec": ToolFieldMapping(
+    "skill_exec":
+    ToolFieldMapping(
         execution_capable=True,
         language=ScriptLanguage.BASH,
         script="command",
@@ -43,7 +45,8 @@ _BUILTIN_DEFAULTS: dict[str, ToolFieldMapping] = {
         env="env",
         timeout="timeout",
     ),
-    "python_exec": ToolFieldMapping(
+    "python_exec":
+    ToolFieldMapping(
         execution_capable=True,
         language=ScriptLanguage.PYTHON,
         script="code",
@@ -51,7 +54,8 @@ _BUILTIN_DEFAULTS: dict[str, ToolFieldMapping] = {
         env="env",
         timeout="timeout",
     ),
-    "bash_exec": ToolFieldMapping(
+    "bash_exec":
+    ToolFieldMapping(
         execution_capable=True,
         language=ScriptLanguage.BASH,
         script="command",
@@ -87,14 +91,11 @@ class ToolInputAdapter:
         *,
         metadata: Mapping[str, Any] | None = None,
     ) -> SafetyScanRequest:
-        script = _extract_scalar(args, self.mapping.script,
-                                 required=self.mapping.execution_capable)
+        script = _extract_scalar(args, self.mapping.script, required=self.mapping.execution_capable)
         if script is None and self.mapping.execution_capable:
-            raise ToolRequestError(
-                f"tool {self.tool_name!r} is execution-capable but no "
-                f"script field was found (expected field "
-                f"{self.mapping.script!r})"
-            )
+            raise ToolRequestError(f"tool {self.tool_name!r} is execution-capable but no "
+                                   f"script field was found (expected field "
+                                   f"{self.mapping.script!r})")
         cwd = _extract_scalar(args, self.mapping.cwd, required=False)
         env = _extract_mapping(args, self.mapping.env)
         argv_value = _extract_sequence(args, self.mapping.argv)
@@ -118,9 +119,7 @@ class ToolInputAdapter:
         )
 
 
-def build_default_adapters(
-    policy: ToolSafetyPolicy,
-) -> dict[str, ToolInputAdapter]:
+def build_default_adapters(policy: ToolSafetyPolicy, ) -> dict[str, ToolInputAdapter]:
     """Build adapters for builtin tools, allowing policy overrides."""
 
     out: dict[str, ToolInputAdapter] = {}
@@ -160,6 +159,7 @@ def resolve_adapter(
 # Helpers
 # --------------------------------------------------------------------------- #
 
+
 def _extract_scalar(
     args: Mapping[str, Any],
     field_name: str | None,
@@ -170,8 +170,7 @@ def _extract_scalar(
         return None
     if field_name not in args:
         if required:
-            raise ToolRequestError(
-                f"required field {field_name!r} missing from tool args")
+            raise ToolRequestError(f"required field {field_name!r} missing from tool args")
         return None
     value = args[field_name]
     if value is None:
@@ -193,8 +192,7 @@ def _extract_mapping(
     if value is None:
         return {}
     if not isinstance(value, Mapping):
-        raise ToolRequestError(
-            f"field {field_name!r} must be a mapping; got {type(value)!r}")
+        raise ToolRequestError(f"field {field_name!r} must be a mapping; got {type(value)!r}")
     return {str(k): str(v) for k, v in value.items()}
 
 
@@ -208,10 +206,10 @@ def _extract_sequence(
     if value is None:
         return ()
     if isinstance(value, str):
-        return (value,)
+        return (value, )
     if isinstance(value, (list, tuple)):
         return tuple(str(v) for v in value)
-    return (str(value),)
+    return (str(value), )
 
 
 def _extract_float(

@@ -64,12 +64,14 @@ class SafetyRule(Protocol):
         self,
         request: SafetyScanRequest,
         policy: ToolSafetyPolicy,
-    ) -> Iterable[SafetyFinding]: ...
+    ) -> Iterable[SafetyFinding]:
+        ...
 
 
 # --------------------------------------------------------------------------- #
 # Decision override helper
 # --------------------------------------------------------------------------- #
+
 
 def resolve_decision(
     rule_id: str,
@@ -98,13 +100,13 @@ def _default_unknown(policy: ToolSafetyPolicy) -> SafetyDecision:
         "needs_human_review": SafetyDecision.NEEDS_HUMAN_REVIEW,
         "deny": SafetyDecision.DENY,
     }
-    return mapping.get(policy.defaults.unknown_construct,
-                       SafetyDecision.NEEDS_HUMAN_REVIEW)
+    return mapping.get(policy.defaults.unknown_construct, SafetyDecision.NEEDS_HUMAN_REVIEW)
 
 
 # --------------------------------------------------------------------------- #
 # Catalog: one checker per rule id
 # --------------------------------------------------------------------------- #
+
 
 def _finding(
     *,
@@ -147,21 +149,24 @@ def check_file_recursive_delete(
     for fact in facts.file_deletes:
         if not fact.recursive:
             continue
-        decision = resolve_decision(
-            "FILE001_RECURSIVE_DELETE", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="FILE001_RECURSIVE_DELETE",
-            category=RiskCategory.FILE,
-            risk=RiskLevel.CRITICAL,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Avoid recursive delete; require explicit file list.",
-            extras={"target": fact.target, "explicit": str(fact.explicit)},
-        ))
+        decision = resolve_decision("FILE001_RECURSIVE_DELETE", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="FILE001_RECURSIVE_DELETE",
+                category=RiskCategory.FILE,
+                risk=RiskLevel.CRITICAL,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Avoid recursive delete; require explicit file list.",
+                extras={
+                    "target": fact.target,
+                    "explicit": str(fact.explicit)
+                },
+            ))
     return out
 
 
@@ -182,36 +187,37 @@ def check_file_denied_write(
                     policy,
                 )
                 if decision != SafetyDecision.ALLOW:
-                    out.append(_finding(
-                        rule_id="FILE002_DENIED_WRITE",
-                        category=RiskCategory.FILE,
-                        risk=RiskLevel.MEDIUM,
-                        decision=decision,
-                        snippet=fact.snippet,
-                        line=fact.loc.line,
-                        column=fact.loc.column,
-                        language=language,
-                        redactor=redactor,
-                        recommendation="Static target could not be resolved; review the write path.",
-                        extras={"target": "<dynamic>"},
-                    ))
+                    out.append(
+                        _finding(
+                            rule_id="FILE002_DENIED_WRITE",
+                            category=RiskCategory.FILE,
+                            risk=RiskLevel.MEDIUM,
+                            decision=decision,
+                            snippet=fact.snippet,
+                            line=fact.loc.line,
+                            column=fact.loc.column,
+                            language=language,
+                            redactor=redactor,
+                            recommendation="Static target could not be resolved; review the write path.",
+                            extras={"target": "<dynamic>"},
+                        ))
             continue
         if _matches_denied_path(fact.target, policy):
-            decision = resolve_decision(
-                "FILE002_DENIED_WRITE", SafetyDecision.DENY, policy)
-            out.append(_finding(
-                rule_id="FILE002_DENIED_WRITE",
-                category=RiskCategory.FILE,
-                risk=RiskLevel.HIGH,
-                decision=decision,
-                snippet=fact.snippet,
-                line=fact.loc.line,
-                column=fact.loc.column,
-                language=language,
-                redactor=redactor,
-                recommendation="Write target is on the denied path list.",
-                extras={"target": fact.target},
-            ))
+            decision = resolve_decision("FILE002_DENIED_WRITE", SafetyDecision.DENY, policy)
+            out.append(
+                _finding(
+                    rule_id="FILE002_DENIED_WRITE",
+                    category=RiskCategory.FILE,
+                    risk=RiskLevel.HIGH,
+                    decision=decision,
+                    snippet=fact.snippet,
+                    line=fact.loc.line,
+                    column=fact.loc.column,
+                    language=language,
+                    redactor=redactor,
+                    recommendation="Write target is on the denied path list.",
+                    extras={"target": fact.target},
+                ))
     return out
 
 
@@ -225,21 +231,21 @@ def check_file_credential_read(
     for fact in facts.file_reads:
         if fact.kind != "credential":
             continue
-        decision = resolve_decision(
-            "FILE003_CREDENTIAL_READ", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="FILE003_CREDENTIAL_READ",
-            category=RiskCategory.FILE,
-            risk=RiskLevel.CRITICAL,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Reading credentials at runtime is forbidden.",
-            extras={"target": fact.target},
-        ))
+        decision = resolve_decision("FILE003_CREDENTIAL_READ", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="FILE003_CREDENTIAL_READ",
+                category=RiskCategory.FILE,
+                risk=RiskLevel.CRITICAL,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Reading credentials at runtime is forbidden.",
+                extras={"target": fact.target},
+            ))
     return out
 
 
@@ -253,21 +259,21 @@ def check_file_dotenv_read(
     for fact in facts.file_reads:
         if fact.kind != "dotenv":
             continue
-        decision = resolve_decision(
-            "FILE004_DOTENV_READ", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="FILE004_DOTENV_READ",
-            category=RiskCategory.FILE,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Loading .env at runtime can leak secrets; inject via env.",
-            extras={"target": fact.target},
-        ))
+        decision = resolve_decision("FILE004_DOTENV_READ", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="FILE004_DOTENV_READ",
+                category=RiskCategory.FILE,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Loading .env at runtime can leak secrets; inject via env.",
+                extras={"target": fact.target},
+            ))
     return out
 
 
@@ -284,21 +290,24 @@ def check_network_non_allowlist(
             continue
         if match_domain(fact.target, allow):
             continue
-        decision = resolve_decision(
-            "NET001_DOMAIN_NOT_ALLOWED", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="NET001_DOMAIN_NOT_ALLOWED",
-            category=RiskCategory.NETWORK,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Host is not on the allow list; add it explicitly.",
-            extras={"host": fact.target, "library": fact.library},
-        ))
+        decision = resolve_decision("NET001_DOMAIN_NOT_ALLOWED", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="NET001_DOMAIN_NOT_ALLOWED",
+                category=RiskCategory.NETWORK,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Host is not on the allow list; add it explicitly.",
+                extras={
+                    "host": fact.target,
+                    "library": fact.library
+                },
+            ))
     return out
 
 
@@ -321,21 +330,24 @@ def check_network_ip_literals(
     for fact in facts.network_calls:
         if fact.dynamic or not _is_ip_literal(fact.target):
             continue
-        decision = resolve_decision(
-            "NET003_IP_LITERAL", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="NET003_IP_LITERAL",
-            category=RiskCategory.NETWORK,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Use an explicitly allowlisted DNS name instead of an IP literal.",
-            extras={"host": fact.target, "library": fact.library},
-        ))
+        decision = resolve_decision("NET003_IP_LITERAL", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="NET003_IP_LITERAL",
+                category=RiskCategory.NETWORK,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Use an explicitly allowlisted DNS name instead of an IP literal.",
+                extras={
+                    "host": fact.target,
+                    "library": fact.library
+                },
+            ))
     return out
 
 
@@ -356,19 +368,20 @@ def check_network_dynamic_target(
         )
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="NET002_DYNAMIC_TARGET",
-            category=RiskCategory.NETWORK,
-            risk=RiskLevel.MEDIUM,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Network target is computed at runtime; review before executing.",
-            extras={"library": fact.library},
-        ))
+        out.append(
+            _finding(
+                rule_id="NET002_DYNAMIC_TARGET",
+                category=RiskCategory.NETWORK,
+                risk=RiskLevel.MEDIUM,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Network target is computed at runtime; review before executing.",
+                extras={"library": fact.library},
+            ))
     return out
 
 
@@ -384,21 +397,21 @@ def check_process_exec(
     for fact in facts.process_calls:
         executable = _first_token(fact.command).lower()
         if executable in deny:
-            decision = resolve_decision(
-                "PROC001_PROCESS_EXEC", SafetyDecision.DENY, policy)
-            out.append(_finding(
-                rule_id="PROC001_PROCESS_EXEC",
-                category=RiskCategory.PROCESS,
-                risk=RiskLevel.HIGH,
-                decision=decision,
-                snippet=fact.snippet,
-                line=fact.loc.line,
-                column=fact.loc.column,
-                language=language,
-                redactor=redactor,
-                recommendation="Executable is on the deny list.",
-                extras={"executable": executable},
-            ))
+            decision = resolve_decision("PROC001_PROCESS_EXEC", SafetyDecision.DENY, policy)
+            out.append(
+                _finding(
+                    rule_id="PROC001_PROCESS_EXEC",
+                    category=RiskCategory.PROCESS,
+                    risk=RiskLevel.HIGH,
+                    decision=decision,
+                    snippet=fact.snippet,
+                    line=fact.loc.line,
+                    column=fact.loc.column,
+                    language=language,
+                    redactor=redactor,
+                    recommendation="Executable is on the deny list.",
+                    extras={"executable": executable},
+                ))
             continue
         # If shell=True, PROC002 handles it.
         if fact.shell is True:
@@ -415,19 +428,20 @@ def check_process_exec(
             )
             if decision == SafetyDecision.ALLOW:
                 continue
-            out.append(_finding(
-                rule_id="PROC001_PROCESS_EXEC",
-                category=RiskCategory.PROCESS,
-                risk=RiskLevel.MEDIUM,
-                decision=decision,
-                snippet=fact.snippet,
-                line=fact.loc.line,
-                column=fact.loc.column,
-                language=language,
-                redactor=redactor,
-                recommendation="Process executable is computed at runtime; review before executing.",
-                extras={"executable": "<dynamic>"},
-            ))
+            out.append(
+                _finding(
+                    rule_id="PROC001_PROCESS_EXEC",
+                    category=RiskCategory.PROCESS,
+                    risk=RiskLevel.MEDIUM,
+                    decision=decision,
+                    snippet=fact.snippet,
+                    line=fact.loc.line,
+                    column=fact.loc.column,
+                    language=language,
+                    redactor=redactor,
+                    recommendation="Process executable is computed at runtime; review before executing.",
+                    extras={"executable": "<dynamic>"},
+                ))
             continue
         # If the command is in user allow list, no finding.
         if allow and executable in allow:
@@ -445,19 +459,20 @@ def check_process_exec(
             )
             if decision == SafetyDecision.ALLOW:
                 continue
-            out.append(_finding(
-                rule_id="PROC001_PROCESS_EXEC",
-                category=RiskCategory.PROCESS,
-                risk=RiskLevel.LOW,
-                decision=decision,
-                snippet=fact.snippet,
-                line=fact.loc.line,
-                column=fact.loc.column,
-                language=language,
-                redactor=redactor,
-                recommendation="Executable is not on the configured allow list.",
-                extras={"executable": executable},
-            ))
+            out.append(
+                _finding(
+                    rule_id="PROC001_PROCESS_EXEC",
+                    category=RiskCategory.PROCESS,
+                    risk=RiskLevel.LOW,
+                    decision=decision,
+                    snippet=fact.snippet,
+                    line=fact.loc.line,
+                    column=fact.loc.column,
+                    language=language,
+                    redactor=redactor,
+                    recommendation="Executable is not on the configured allow list.",
+                    extras={"executable": executable},
+                ))
             continue
         # No allow list configured; trust the safe set + deny list above.
         # Other catalog rules still vet file/network/secret behavior.
@@ -474,21 +489,21 @@ def check_shell_injection(
     for fact in facts.process_calls:
         if fact.shell is not True:
             continue
-        decision = resolve_decision(
-            "PROC002_SHELL_INJECTION", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="PROC002_SHELL_INJECTION",
-            category=RiskCategory.PROCESS,
-            risk=RiskLevel.CRITICAL,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Use argument lists (shell=False) to avoid shell injection.",
-            extras={"executable": _first_token(fact.command) or "<dynamic>"},
-        ))
+        decision = resolve_decision("PROC002_SHELL_INJECTION", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="PROC002_SHELL_INJECTION",
+                category=RiskCategory.PROCESS,
+                risk=RiskLevel.CRITICAL,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Use argument lists (shell=False) to avoid shell injection.",
+                extras={"executable": _first_token(fact.command) or "<dynamic>"},
+            ))
     return out
 
 
@@ -507,19 +522,20 @@ def check_shell_operator(
         )
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="PROC003_SHELL_OPERATOR",
-            category=RiskCategory.PROCESS,
-            risk=RiskLevel.MEDIUM,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Shell operators require review; split into explicit steps.",
-            extras={"operator": fact.operator},
-        ))
+        out.append(
+            _finding(
+                rule_id="PROC003_SHELL_OPERATOR",
+                category=RiskCategory.PROCESS,
+                risk=RiskLevel.MEDIUM,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Shell operators require review; split into explicit steps.",
+                extras={"operator": fact.operator},
+            ))
     return out
 
 
@@ -531,21 +547,21 @@ def check_privilege_escalation(
 ) -> list[SafetyFinding]:
     out: list[SafetyFinding] = []
     for fact in facts.privilege_commands:
-        decision = resolve_decision(
-            "PROC004_PRIVILEGE", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="PROC004_PRIVILEGE",
-            category=RiskCategory.PROCESS,
-            risk=RiskLevel.CRITICAL,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Privilege escalation commands are forbidden.",
-            extras={"command": fact.command},
-        ))
+        decision = resolve_decision("PROC004_PRIVILEGE", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="PROC004_PRIVILEGE",
+                category=RiskCategory.PROCESS,
+                risk=RiskLevel.CRITICAL,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Privilege escalation commands are forbidden.",
+                extras={"command": fact.command},
+            ))
     return out
 
 
@@ -567,19 +583,23 @@ def check_dependency_install(
         if decision == SafetyDecision.ALLOW:
             continue
         risk = RiskLevel.HIGH if decision == SafetyDecision.DENY else RiskLevel.MEDIUM
-        out.append(_finding(
-            rule_id="DEP001_ENV_MUTATION",
-            category=RiskCategory.DEPENDENCY,
-            risk=risk,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Dependency installation mutates the runtime image.",
-            extras={"manager": fact.manager, "command": fact.command},
-        ))
+        out.append(
+            _finding(
+                rule_id="DEP001_ENV_MUTATION",
+                category=RiskCategory.DEPENDENCY,
+                risk=risk,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Dependency installation mutates the runtime image.",
+                extras={
+                    "manager": fact.manager,
+                    "command": fact.command
+                },
+            ))
     return out
 
 
@@ -591,21 +611,21 @@ def check_unbounded_loop(
 ) -> list[SafetyFinding]:
     out: list[SafetyFinding] = []
     for fact in facts.unbounded_loops:
-        decision = resolve_decision(
-            "RES001_UNBOUNDED_LOOP", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="RES001_UNBOUNDED_LOOP",
-            category=RiskCategory.RESOURCE,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Loop has no static exit condition; rewrite with a bounded range.",
-            extras={"kind": fact.kind},
-        ))
+        decision = resolve_decision("RES001_UNBOUNDED_LOOP", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="RES001_UNBOUNDED_LOOP",
+                category=RiskCategory.RESOURCE,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Loop has no static exit condition; rewrite with a bounded range.",
+                extras={"kind": fact.kind},
+            ))
     return out
 
 
@@ -617,21 +637,21 @@ def check_fork_bomb(
 ) -> list[SafetyFinding]:
     out: list[SafetyFinding] = []
     for fact in facts.fork_bombs:
-        decision = resolve_decision(
-            "RES002_FORK_BOMB", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="RES002_FORK_BOMB",
-            category=RiskCategory.RESOURCE,
-            risk=RiskLevel.CRITICAL,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Fork-bomb pattern detected.",
-            extras={"pattern": fact.pattern},
-        ))
+        decision = resolve_decision("RES002_FORK_BOMB", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="RES002_FORK_BOMB",
+                category=RiskCategory.RESOURCE,
+                risk=RiskLevel.CRITICAL,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Fork-bomb pattern detected.",
+                extras={"pattern": fact.pattern},
+            ))
     return out
 
 
@@ -652,27 +672,30 @@ def check_long_sleep(
             )
             risk = RiskLevel.LOW
         elif fact.duration_seconds > threshold:
-            decision = resolve_decision(
-                "RES003_LONG_SLEEP", SafetyDecision.DENY, policy)
+            decision = resolve_decision("RES003_LONG_SLEEP", SafetyDecision.DENY, policy)
             risk = RiskLevel.MEDIUM
         else:
             continue
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="RES003_LONG_SLEEP",
-            category=RiskCategory.RESOURCE,
-            risk=risk,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Sleep exceeds or hides its duration; verify it is bounded.",
-            extras={"duration_seconds": str(fact.duration_seconds),
-                    "raw": fact.raw, "limit_seconds": str(threshold)},
-        ))
+        out.append(
+            _finding(
+                rule_id="RES003_LONG_SLEEP",
+                category=RiskCategory.RESOURCE,
+                risk=risk,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Sleep exceeds or hides its duration; verify it is bounded.",
+                extras={
+                    "duration_seconds": str(fact.duration_seconds),
+                    "raw": fact.raw,
+                    "limit_seconds": str(threshold)
+                },
+            ))
     return out
 
 
@@ -693,27 +716,30 @@ def check_concurrency(
             )
             risk = RiskLevel.LOW
         elif fact.count > threshold:
-            decision = resolve_decision(
-                "RES004_CONCURRENCY", SafetyDecision.DENY, policy)
+            decision = resolve_decision("RES004_CONCURRENCY", SafetyDecision.DENY, policy)
             risk = RiskLevel.MEDIUM
         else:
             continue
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="RES004_CONCURRENCY",
-            category=RiskCategory.RESOURCE,
-            risk=risk,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Concurrency exceeds policy; reduce fan-out.",
-            extras={"count": str(fact.count), "raw": fact.raw,
-                    "limit": str(threshold)},
-        ))
+        out.append(
+            _finding(
+                rule_id="RES004_CONCURRENCY",
+                category=RiskCategory.RESOURCE,
+                risk=risk,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Concurrency exceeds policy; reduce fan-out.",
+                extras={
+                    "count": str(fact.count),
+                    "raw": fact.raw,
+                    "limit": str(threshold)
+                },
+            ))
     return out
 
 
@@ -734,27 +760,30 @@ def check_large_write(
             )
             risk = RiskLevel.LOW
         elif fact.size > threshold:
-            decision = resolve_decision(
-                "RES005_LARGE_WRITE", SafetyDecision.DENY, policy)
+            decision = resolve_decision("RES005_LARGE_WRITE", SafetyDecision.DENY, policy)
             risk = RiskLevel.MEDIUM
         else:
             continue
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="RES005_LARGE_WRITE",
-            category=RiskCategory.RESOURCE,
-            risk=risk,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="File write exceeds size budget or hides its size.",
-            extras={"size_bytes": str(fact.size), "target": fact.target,
-                    "limit_bytes": str(threshold)},
-        ))
+        out.append(
+            _finding(
+                rule_id="RES005_LARGE_WRITE",
+                category=RiskCategory.RESOURCE,
+                risk=risk,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="File write exceeds size budget or hides its size.",
+                extras={
+                    "size_bytes": str(fact.size),
+                    "target": fact.target,
+                    "limit_bytes": str(threshold)
+                },
+            ))
     return out
 
 
@@ -768,21 +797,24 @@ def check_secret_to_output(
     for fact in facts.secret_flows:
         if fact.sink_kind != "output":
             continue
-        decision = resolve_decision(
-            "SECRET001_LOG_SINK", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="SECRET001_LOG_SINK",
-            category=RiskCategory.SECRET,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Secret-looking value flows into a log/print sink.",
-            extras={"source": fact.source, "sink": fact.sink},
-        ))
+        decision = resolve_decision("SECRET001_LOG_SINK", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="SECRET001_LOG_SINK",
+                category=RiskCategory.SECRET,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Secret-looking value flows into a log/print sink.",
+                extras={
+                    "source": fact.source,
+                    "sink": fact.sink
+                },
+            ))
     return out
 
 
@@ -796,21 +828,24 @@ def check_secret_to_file(
     for fact in facts.secret_flows:
         if fact.sink_kind != "file":
             continue
-        decision = resolve_decision(
-            "SECRET002_FILE_SINK", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="SECRET002_FILE_SINK",
-            category=RiskCategory.SECRET,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Secret-looking value flows into a file sink.",
-            extras={"source": fact.source, "sink": fact.sink},
-        ))
+        decision = resolve_decision("SECRET002_FILE_SINK", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="SECRET002_FILE_SINK",
+                category=RiskCategory.SECRET,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Secret-looking value flows into a file sink.",
+                extras={
+                    "source": fact.source,
+                    "sink": fact.sink
+                },
+            ))
     return out
 
 
@@ -824,21 +859,24 @@ def check_secret_to_network(
     for fact in facts.secret_flows:
         if fact.sink_kind != "network":
             continue
-        decision = resolve_decision(
-            "SECRET003_NETWORK_SINK", SafetyDecision.DENY, policy)
-        out.append(_finding(
-            rule_id="SECRET003_NETWORK_SINK",
-            category=RiskCategory.SECRET,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Secret-looking value flows into a network sink.",
-            extras={"source": fact.source, "sink": fact.sink},
-        ))
+        decision = resolve_decision("SECRET003_NETWORK_SINK", SafetyDecision.DENY, policy)
+        out.append(
+            _finding(
+                rule_id="SECRET003_NETWORK_SINK",
+                category=RiskCategory.SECRET,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Secret-looking value flows into a network sink.",
+                extras={
+                    "source": fact.source,
+                    "sink": fact.sink
+                },
+            ))
     return out
 
 
@@ -857,19 +895,20 @@ def check_parse_error(
         )
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="PARSE001_UNCERTAIN",
-            category=RiskCategory.ANALYSIS,
-            risk=RiskLevel.MEDIUM,
-            decision=decision,
-            snippet=fact.snippet or fact.message,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Could not parse the script; treat as untrusted.",
-            extras={"message": fact.message},
-        ))
+        out.append(
+            _finding(
+                rule_id="PARSE001_UNCERTAIN",
+                category=RiskCategory.ANALYSIS,
+                risk=RiskLevel.MEDIUM,
+                decision=decision,
+                snippet=fact.snippet or fact.message,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Could not parse the script; treat as untrusted.",
+                extras={"message": fact.message},
+            ))
     return out
 
 
@@ -888,19 +927,20 @@ def check_dynamic_exec(
         )
         if decision == SafetyDecision.ALLOW:
             continue
-        out.append(_finding(
-            rule_id="OBF001_DYNAMIC_EXEC",
-            category=RiskCategory.ANALYSIS,
-            risk=RiskLevel.HIGH,
-            decision=decision,
-            snippet=fact.snippet,
-            line=fact.loc.line,
-            column=fact.loc.column,
-            language=language,
-            redactor=redactor,
-            recommendation="Dynamic code execution hides intent; replace with a static call.",
-            extras={"kind": fact.kind},
-        ))
+        out.append(
+            _finding(
+                rule_id="OBF001_DYNAMIC_EXEC",
+                category=RiskCategory.ANALYSIS,
+                risk=RiskLevel.HIGH,
+                decision=decision,
+                snippet=fact.snippet,
+                line=fact.loc.line,
+                column=fact.loc.column,
+                language=language,
+                redactor=redactor,
+                recommendation="Dynamic code execution hides intent; replace with a static call.",
+                extras={"kind": fact.kind},
+            ))
     return out
 
 
@@ -947,6 +987,7 @@ def evaluate_facts(
 # --------------------------------------------------------------------------- #
 # Rule objects
 # --------------------------------------------------------------------------- #
+
 
 class _LanguageScannerRule:
     """Shared base for Python/Bash rules.
@@ -1030,26 +1071,115 @@ def _concurrency_limit_for(
 # Other rules (file read of credentials, secret flow, network checks)
 # still apply when these commands touch sensitive targets.
 _SAFE_BASH_COMMANDS: frozenset[str] = frozenset({
-    "echo", "printf", "ls", "ll", "pwd", "cd", "cat", "head", "tail",
-    "less", "more", "view", "grep", "egrep", "fgrep", "rg", "ack",
-    "wc", "sort", "uniq", "tr", "cut", "paste", "expand", "unexpand",
-    "date", "cal", "uptime", "whoami", "id", "groups", "hostname",
-    "uname", "env", "printenv", "set", "true", "false", "test", "[",
-    "basename", "dirname", "realpath", "readlink", "which", "whereis",
-    "file", "stat", "ldd", "du", "df", "free", "vmstat", "seq", "yes",
+    "echo",
+    "printf",
+    "ls",
+    "ll",
+    "pwd",
+    "cd",
+    "cat",
+    "head",
+    "tail",
+    "less",
+    "more",
+    "view",
+    "grep",
+    "egrep",
+    "fgrep",
+    "rg",
+    "ack",
+    "wc",
+    "sort",
+    "uniq",
+    "tr",
+    "cut",
+    "paste",
+    "expand",
+    "unexpand",
+    "date",
+    "cal",
+    "uptime",
+    "whoami",
+    "id",
+    "groups",
+    "hostname",
+    "uname",
+    "env",
+    "printenv",
+    "set",
+    "true",
+    "false",
+    "test",
+    "[",
+    "basename",
+    "dirname",
+    "realpath",
+    "readlink",
+    "which",
+    "whereis",
+    "file",
+    "stat",
+    "ldd",
+    "du",
+    "df",
+    "free",
+    "vmstat",
+    "seq",
+    "yes",
     "tee",  # tee writes files but FILE002 catches sensitive targets
     "xargs",  # may invoke subcommands; those are recorded as separate facts
     "find",  # find -delete handled separately
-    "ps", "lsof", "netstat", "ss", "ip", "ifconfig", "arp",
-    "man", "help", "type", "command", "hash",
-    "getopts", "getopt", "sleep",  # RES003 catches long sleeps
-    "clear", "reset", "history", "alias", "unalias",
-    "set", "unset", "export", "shift", "shopt", "source", ".",
-    "python", "python3", "python2", "node", "ruby", "perl",
-    "git", "go", "cargo", "rustc", "gcc", "clang",
-    "curl", "wget",  # NET001/NET002 vet targets
-    "ssh", "scp", "sftp",  # treated as network calls
-    "tar", "zip", "unzip", "gzip", "gunzip", "bzip2", "xz",
+    "ps",
+    "lsof",
+    "netstat",
+    "ss",
+    "ip",
+    "ifconfig",
+    "arp",
+    "man",
+    "help",
+    "type",
+    "command",
+    "hash",
+    "getopts",
+    "getopt",
+    "sleep",  # RES003 catches long sleeps
+    "clear",
+    "reset",
+    "history",
+    "alias",
+    "unalias",
+    "set",
+    "unset",
+    "export",
+    "shift",
+    "shopt",
+    "source",
+    ".",
+    "python",
+    "python3",
+    "python2",
+    "node",
+    "ruby",
+    "perl",
+    "git",
+    "go",
+    "cargo",
+    "rustc",
+    "gcc",
+    "clang",
+    "curl",
+    "wget",  # NET001/NET002 vet targets
+    "ssh",
+    "scp",
+    "sftp",  # treated as network calls
+    "tar",
+    "zip",
+    "unzip",
+    "gzip",
+    "gunzip",
+    "bzip2",
+    "xz",
 })
 
 

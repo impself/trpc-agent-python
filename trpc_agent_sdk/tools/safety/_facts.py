@@ -127,8 +127,7 @@ class SecretFlowFact(Fact):
 
     source: str = ""
     sink: str = ""
-    sink_kind: Literal["output", "file", "network", "subprocess",
-                       "unknown"] = "unknown"
+    sink_kind: Literal["output", "file", "network", "subprocess", "unknown"] = "unknown"
 
 
 @dataclass(frozen=True)
@@ -194,13 +193,21 @@ class ScriptFacts:
         )
 
     def has_any(self) -> bool:
-        return any(
-            (
-                self.file_deletes, self.file_writes, self.file_reads,
-                self.network_calls, self.process_calls, self.shell_operators,
-                self.privilege_commands, self.dependency_installs,
-                self.unbounded_loops, self.fork_bombs, self.long_sleeps,
-                self.concurrency, self.large_writes, self.secret_flows,
-                self.dynamic_execs, self.parse_errors,
-            )
-        )
+        return any((
+            self.file_deletes,
+            self.file_writes,
+            self.file_reads,
+            self.network_calls,
+            self.process_calls,
+            self.shell_operators,
+            self.privilege_commands,
+            self.dependency_installs,
+            self.unbounded_loops,
+            self.fork_bombs,
+            self.long_sleeps,
+            self.concurrency,
+            self.large_writes,
+            self.secret_flows,
+            self.dynamic_execs,
+            self.parse_errors,
+        ))

@@ -57,9 +57,7 @@ class NetworkPolicy(BaseModel):
             if not d:
                 raise SafetyPolicyError(f"invalid domain entry: {domain!r}")
             if "*" in d and not d.startswith("*."):
-                raise SafetyPolicyError(
-                    f"wildcard domain must start with '*.': {domain!r}"
-                )
+                raise SafetyPolicyError(f"wildcard domain must start with '*.': {domain!r}")
             normalized.append(d)
         return tuple(normalized)
 
@@ -124,10 +122,8 @@ class LimitsPolicy(BaseModel):
 
     @model_validator(mode="after")
     def _check_non_negative(self) -> "LimitsPolicy":
-        for field_name in ("max_timeout_seconds", "max_output_bytes",
-                           "max_script_bytes", "max_sleep_seconds",
-                           "max_parallel_tasks", "max_processes",
-                           "max_file_write_bytes"):
+        for field_name in ("max_timeout_seconds", "max_output_bytes", "max_script_bytes", "max_sleep_seconds",
+                           "max_parallel_tasks", "max_processes", "max_file_write_bytes"):
             value = getattr(self, field_name)
             if value < 0:
                 raise SafetyPolicyError(f"{field_name} must be non-negative")
@@ -148,9 +144,7 @@ class DefaultsPolicy(BaseModel):
     def _validate_decision(cls, value: str) -> str:
         allowed = {"allow", "needs_human_review", "deny"}
         if value not in allowed:
-            raise SafetyPolicyError(
-                f"decision must be one of {sorted(allowed)}; got {value!r}"
-            )
+            raise SafetyPolicyError(f"decision must be one of {sorted(allowed)}; got {value!r}")
         return value
 
 
@@ -203,9 +197,7 @@ class ToolSafetyPolicy(BaseModel):
     @classmethod
     def _check_version(cls, value: str) -> str:
         if value != POLICY_VERSION:
-            raise SafetyPolicyError(
-                f"unsupported policy version {value!r}; expected {POLICY_VERSION!r}"
-            )
+            raise SafetyPolicyError(f"unsupported policy version {value!r}; expected {POLICY_VERSION!r}")
         return value
 
     @model_validator(mode="after")
@@ -213,10 +205,8 @@ class ToolSafetyPolicy(BaseModel):
         allowed = {"allow", "needs_human_review", "deny"}
         for rule_id, action in self.rule_overrides.items():
             if action not in allowed:
-                raise SafetyPolicyError(
-                    f"rule_overrides[{rule_id!r}] must be one of "
-                    f"{sorted(allowed)}; got {action!r}"
-                )
+                raise SafetyPolicyError(f"rule_overrides[{rule_id!r}] must be one of "
+                                        f"{sorted(allowed)}; got {action!r}")
         return self
 
     @property
@@ -239,6 +229,7 @@ class AuditPolicy(BaseModel):
 # --------------------------------------------------------------------------- #
 # Loading
 # --------------------------------------------------------------------------- #
+
 
 def load_safety_policy(path: str | os.PathLike[str]) -> ToolSafetyPolicy:
     """Load and validate a YAML policy file.
@@ -344,11 +335,8 @@ def match_path_glob(path: str, pattern: str) -> bool:
     # Also accept ``pattern/**`` style matches: /etc matches /etc/passwd.
     if norm_pattern and not norm_pattern.endswith("**"):
         prefix = norm_pattern.rstrip("/")
-        if prefix and (norm_path == prefix
-                       or norm_path.startswith(prefix + "/")
-                       or norm_path.startswith(prefix + "\\")
-                       or (prefix.startswith("~") and
-                           norm_path.startswith(prefix + "/"))):
+        if prefix and (norm_path == prefix or norm_path.startswith(prefix + "/") or norm_path.startswith(prefix + "\\")
+                       or (prefix.startswith("~") and norm_path.startswith(prefix + "/"))):
             return True
         # Try with explicit /** suffix.
         if fnmatch.fnmatch(norm_path, f"{norm_pattern}/**"):
@@ -408,8 +396,7 @@ def _shell_match(value: str, pattern: str) -> bool:
 
 def _compute_policy_hash(policy: ToolSafetyPolicy) -> str:
     canonical = policy.model_dump(mode="json", exclude_none=True)
-    serialized = json.dumps(canonical, sort_keys=True,
-                            separators=(",", ":"), ensure_ascii=False)
+    serialized = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 

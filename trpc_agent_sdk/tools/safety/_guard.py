@@ -75,8 +75,7 @@ class ToolSafetyGuard:
             except Exception as exc:  # pragma: no cover - defensive
                 scan_error = exc
         if scan_error is not None:
-            findings.append(self._internal_error_finding(scan_error, redactor,
-                                                         request))
+            findings.append(self._internal_error_finding(scan_error, redactor, request))
         findings = _deduplicate(findings)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         return self._build_report(request, findings, elapsed_ms, redactor)
@@ -104,8 +103,7 @@ class ToolSafetyGuard:
         for rule in self._rules:
             rule_id = getattr(rule, "rule_id", "")
             if not rule_id:
-                raise SafetyGuardError(
-                    f"rule {rule!r} is missing a stable rule_id")
+                raise SafetyGuardError(f"rule {rule!r} is missing a stable rule_id")
             if rule_id in seen:
                 raise SafetyGuardError(f"duplicate rule_id {rule_id!r}")
             seen.add(rule_id)
@@ -117,8 +115,7 @@ class ToolSafetyGuard:
         if len(request.script.encode("utf-8", errors="ignore")) > limit:
             # Build a finding via the rule catalog so the decision is
             # consistent. We add it through findings below by raising.
-            raise SafetyScannerError(
-                f"script exceeds max_script_bytes={limit}")
+            raise SafetyScannerError(f"script exceeds max_script_bytes={limit}")
 
     def _internal_error_finding(
         self,
@@ -132,8 +129,7 @@ class ToolSafetyGuard:
             "needs_human_review": SafetyDecision.NEEDS_HUMAN_REVIEW,
             "deny": SafetyDecision.DENY,
         }
-        decision = mapping.get(self.policy.defaults.guard_error,
-                               SafetyDecision.DENY)
+        decision = mapping.get(self.policy.defaults.guard_error, SafetyDecision.DENY)
         message = type(exc).__name__
         evidence = redactor.build_evidence(
             snippet=f"guard error: {message}",
@@ -157,16 +153,14 @@ class ToolSafetyGuard:
         elapsed_ms: float,
         redactor: Redactor,
     ) -> SafetyReport:
-        script_sha = hashlib.sha256(
-            request.script.encode("utf-8", errors="ignore")
-        ).hexdigest()
+        script_sha = hashlib.sha256(request.script.encode("utf-8", errors="ignore")).hexdigest()
         report_id = _new_report_id()
         if not findings:
             return SafetyReport(
                 report_id=report_id,
                 decision=SafetyDecision.ALLOW,
                 risk_level=RiskLevel.INFO,
-                rule_ids=(SAFE_RULE_ID,),
+                rule_ids=(SAFE_RULE_ID, ),
                 findings=(),
                 recommendation="No safety rules matched.",
                 policy_hash=self.policy_hash,
@@ -190,16 +184,12 @@ class ToolSafetyGuard:
             policy_version=self.policy_version,
             script_sha256=script_sha,
             scan_duration_ms=elapsed_ms,
-            redacted=redactor.active or any(
-                evidence_was_redacted(finding.evidence)
-                for finding in findings
-            ),
+            redacted=redactor.active or any(evidence_was_redacted(finding.evidence) for finding in findings),
         )
 
 
 # Imports here to avoid circular import at module load.
 from trpc_agent_sdk.tools.safety._models import RiskCategory  # noqa: E402
-
 
 # --------------------------------------------------------------------------- #
 # Aggregation helpers (kept here so the module owns its decision surface)
@@ -234,9 +224,7 @@ def _stable_rule_ids(findings: Iterable[SafetyFinding]) -> tuple[str, ...]:
     return tuple(sorted({f.rule_id for f in findings}))
 
 
-def _aggregate_recommendation(
-    findings: list[SafetyFinding], decision: SafetyDecision
-) -> str:
+def _aggregate_recommendation(findings: list[SafetyFinding], decision: SafetyDecision) -> str:
     if decision == SafetyDecision.DENY:
         return "Block execution and request a human-approved path."
     if decision == SafetyDecision.NEEDS_HUMAN_REVIEW:
@@ -253,8 +241,11 @@ def _deduplicate(findings: list[SafetyFinding]) -> list[SafetyFinding]:
     seen: set[tuple[str, int, str, int]] = set()
     unique: list[SafetyFinding] = []
     for finding in findings:
-        key = (finding.rule_id, finding.decision.value,  # type: ignore[union-attr]
-               finding.evidence.snippet, finding.evidence.line)
+        key = (
+            finding.rule_id,
+            finding.decision.value,  # type: ignore[union-attr]
+            finding.evidence.snippet,
+            finding.evidence.line)
         if key in seen:
             continue
         seen.add(key)

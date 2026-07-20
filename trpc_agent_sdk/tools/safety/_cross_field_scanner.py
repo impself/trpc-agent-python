@@ -33,7 +33,6 @@ from trpc_agent_sdk.tools.safety._rules import (
     resolve_decision,
 )
 
-
 _CWD_RULE_ID = "FILE002_DENIED_WRITE"
 _TIMEOUT_RULE_ID = "RES003_LONG_SLEEP"
 _ARGV_RULE_ID = "PROC001_PROCESS_EXEC"
@@ -72,24 +71,9 @@ class CrossFieldScannerRule(SafetyRule):
         normalized = normalize_script_path_for_match(request.cwd)
         # Detect escaping paths (../../etc)
         if ".." in request.cwd.replace("\\", "/").split("/"):
-            decision = resolve_decision(
-                _CWD_RULE_ID, SafetyDecision.DENY, policy)
-            return [_finding(
-                rule_id=_CWD_RULE_ID,
-                category=RiskCategory.FILE,
-                risk=RiskLevel.HIGH,
-                decision=decision,
-                snippet=f"cwd={request.cwd}",
-                language=ScriptLanguage.UNKNOWN,
-                redactor=redactor,
-                recommendation="cwd attempts to escape via '..'.",
-                extras={"cwd": "<redacted>"},
-            )]
-        for pattern in policy.paths.deny:
-            if match_path_glob(normalized, pattern):
-                decision = resolve_decision(
-                    _CWD_RULE_ID, SafetyDecision.DENY, policy)
-                return [_finding(
+            decision = resolve_decision(_CWD_RULE_ID, SafetyDecision.DENY, policy)
+            return [
+                _finding(
                     rule_id=_CWD_RULE_ID,
                     category=RiskCategory.FILE,
                     risk=RiskLevel.HIGH,
@@ -97,9 +81,26 @@ class CrossFieldScannerRule(SafetyRule):
                     snippet=f"cwd={request.cwd}",
                     language=ScriptLanguage.UNKNOWN,
                     redactor=redactor,
-                    recommendation="cwd is on the denied path list.",
-                    extras={"matched_pattern": pattern},
-                )]
+                    recommendation="cwd attempts to escape via '..'.",
+                    extras={"cwd": "<redacted>"},
+                )
+            ]
+        for pattern in policy.paths.deny:
+            if match_path_glob(normalized, pattern):
+                decision = resolve_decision(_CWD_RULE_ID, SafetyDecision.DENY, policy)
+                return [
+                    _finding(
+                        rule_id=_CWD_RULE_ID,
+                        category=RiskCategory.FILE,
+                        risk=RiskLevel.HIGH,
+                        decision=decision,
+                        snippet=f"cwd={request.cwd}",
+                        language=ScriptLanguage.UNKNOWN,
+                        redactor=redactor,
+                        recommendation="cwd is on the denied path list.",
+                        extras={"matched_pattern": pattern},
+                    )
+                ]
         return []
 
     def _check_timeout(
@@ -112,19 +113,20 @@ class CrossFieldScannerRule(SafetyRule):
             return []
         limit = policy.limits.max_timeout_seconds
         if request.requested_timeout_seconds > limit:
-            decision = resolve_decision(
-                _TIMEOUT_RULE_ID, SafetyDecision.DENY, policy)
-            return [_finding(
-                rule_id=_TIMEOUT_RULE_ID,
-                category=RiskCategory.RESOURCE,
-                risk=RiskLevel.MEDIUM,
-                decision=decision,
-                snippet=f"timeout={request.requested_timeout_seconds}s",
-                language=ScriptLanguage.UNKNOWN,
-                redactor=redactor,
-                recommendation="Requested timeout exceeds policy limit.",
-                extras={"limit_seconds": str(limit)},
-            )]
+            decision = resolve_decision(_TIMEOUT_RULE_ID, SafetyDecision.DENY, policy)
+            return [
+                _finding(
+                    rule_id=_TIMEOUT_RULE_ID,
+                    category=RiskCategory.RESOURCE,
+                    risk=RiskLevel.MEDIUM,
+                    decision=decision,
+                    snippet=f"timeout={request.requested_timeout_seconds}s",
+                    language=ScriptLanguage.UNKNOWN,
+                    redactor=redactor,
+                    recommendation="Requested timeout exceeds policy limit.",
+                    extras={"limit_seconds": str(limit)},
+                )
+            ]
         return []
 
     def _check_argv(
@@ -143,19 +145,22 @@ class CrossFieldScannerRule(SafetyRule):
             if not token:
                 continue
             if token in deny:
-                decision = resolve_decision(
-                    _ARGV_RULE_ID, SafetyDecision.DENY, policy)
-                findings.append(_finding(
-                    rule_id=_ARGV_RULE_ID,
-                    category=RiskCategory.PROCESS,
-                    risk=RiskLevel.HIGH,
-                    decision=decision,
-                    snippet=f"argv[{idx}]={token}",
-                    language=ScriptLanguage.UNKNOWN,
-                    redactor=redactor,
-                    recommendation="argv references a denied executable.",
-                    extras={"index": str(idx), "executable": token},
-                ))
+                decision = resolve_decision(_ARGV_RULE_ID, SafetyDecision.DENY, policy)
+                findings.append(
+                    _finding(
+                        rule_id=_ARGV_RULE_ID,
+                        category=RiskCategory.PROCESS,
+                        risk=RiskLevel.HIGH,
+                        decision=decision,
+                        snippet=f"argv[{idx}]={token}",
+                        language=ScriptLanguage.UNKNOWN,
+                        redactor=redactor,
+                        recommendation="argv references a denied executable.",
+                        extras={
+                            "index": str(idx),
+                            "executable": token
+                        },
+                    ))
                 continue
             if allow and token not in allow and _looks_like_executable(arg):
                 decision = resolve_decision(
@@ -165,17 +170,21 @@ class CrossFieldScannerRule(SafetyRule):
                 )
                 if decision == SafetyDecision.ALLOW:
                     continue
-                findings.append(_finding(
-                    rule_id=_ARGV_RULE_ID,
-                    category=RiskCategory.PROCESS,
-                    risk=RiskLevel.LOW,
-                    decision=decision,
-                    snippet=f"argv[{idx}]={token}",
-                    language=ScriptLanguage.UNKNOWN,
-                    redactor=redactor,
-                    recommendation="argv contains an executable not on the allow list.",
-                    extras={"index": str(idx), "executable": token},
-                ))
+                findings.append(
+                    _finding(
+                        rule_id=_ARGV_RULE_ID,
+                        category=RiskCategory.PROCESS,
+                        risk=RiskLevel.LOW,
+                        decision=decision,
+                        snippet=f"argv[{idx}]={token}",
+                        language=ScriptLanguage.UNKNOWN,
+                        redactor=redactor,
+                        recommendation="argv contains an executable not on the allow list.",
+                        extras={
+                            "index": str(idx),
+                            "executable": token
+                        },
+                    ))
         return findings
 
     def _check_tool_mapping(
@@ -203,18 +212,22 @@ class CrossFieldScannerRule(SafetyRule):
         )
         if decision == SafetyDecision.ALLOW:
             return []
-        return [_finding(
-            rule_id=_TOOL_MAPPING_RULE_ID,
-            category=RiskCategory.ANALYSIS,
-            risk=RiskLevel.MEDIUM,
-            decision=decision,
-            snippet="tool marked execution_capable without adapter mapping",
-            language=ScriptLanguage.UNKNOWN,
-            redactor=redactor,
-            recommendation="Declare a tool adapter mapping in policy.tools or disable execution.",
-            extras={"tool_name": request.tool_name,
-                    "tool_kind": request.tool_kind.value},
-        )]
+        return [
+            _finding(
+                rule_id=_TOOL_MAPPING_RULE_ID,
+                category=RiskCategory.ANALYSIS,
+                risk=RiskLevel.MEDIUM,
+                decision=decision,
+                snippet="tool marked execution_capable without adapter mapping",
+                language=ScriptLanguage.UNKNOWN,
+                redactor=redactor,
+                recommendation="Declare a tool adapter mapping in policy.tools or disable execution.",
+                extras={
+                    "tool_name": request.tool_name,
+                    "tool_kind": request.tool_kind.value
+                },
+            )
+        ]
 
     def _check_output_budget(
         self,
@@ -226,19 +239,20 @@ class CrossFieldScannerRule(SafetyRule):
             return []
         limit = policy.limits.max_output_bytes
         if request.requested_output_bytes > limit:
-            decision = resolve_decision(
-                "RES005_LARGE_WRITE", SafetyDecision.DENY, policy)
-            return [_finding(
-                rule_id="RES005_LARGE_WRITE",
-                category=RiskCategory.RESOURCE,
-                risk=RiskLevel.MEDIUM,
-                decision=decision,
-                snippet=f"requested_output={request.requested_output_bytes}",
-                language=ScriptLanguage.UNKNOWN,
-                redactor=redactor,
-                recommendation="Requested output exceeds policy max_output_bytes.",
-                extras={"limit_bytes": str(limit)},
-            )]
+            decision = resolve_decision("RES005_LARGE_WRITE", SafetyDecision.DENY, policy)
+            return [
+                _finding(
+                    rule_id="RES005_LARGE_WRITE",
+                    category=RiskCategory.RESOURCE,
+                    risk=RiskLevel.MEDIUM,
+                    decision=decision,
+                    snippet=f"requested_output={request.requested_output_bytes}",
+                    language=ScriptLanguage.UNKNOWN,
+                    redactor=redactor,
+                    recommendation="Requested output exceeds policy max_output_bytes.",
+                    extras={"limit_bytes": str(limit)},
+                )
+            ]
         return []
 
 
