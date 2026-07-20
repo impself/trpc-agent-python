@@ -20,7 +20,7 @@ from trpc_agent_sdk.tools.safety._telemetry import (
 def _make_report(decision: SafetyDecision = SafetyDecision.ALLOW,
                  risk: RiskLevel = RiskLevel.INFO,
                  blocked: bool = False,
-                 rule_ids: tuple[str, ...] = ("SAFE000",),
+                 rule_ids: tuple[str, ...] = ("SAFE000", ),
                  duration_ms: float = 0.1) -> SafetyReport:
     return SafetyReport(
         report_id="r1",
@@ -38,6 +38,7 @@ def _make_report(decision: SafetyDecision = SafetyDecision.ALLOW,
 
 
 class TestTelemetrySink:
+
     def test_construct_no_otel_installed(self):
         # Construction must not raise even when OTel is missing.
         sink = TelemetrySink()
@@ -52,14 +53,12 @@ class TestTelemetrySink:
         assert attrs["trpc_agent_sdk.tools.safety.redacted"] is False
         assert attrs["trpc_agent_sdk.tools.safety.policy_hash"] == "p"
         assert attrs["trpc_agent_sdk.tools.safety.rule_id"] == "SAFE000"
-        assert isinstance(attrs["trpc_agent_sdk.tools.safety.scan_duration_ms"],
-                          float)
+        assert isinstance(attrs["trpc_agent_sdk.tools.safety.scan_duration_ms"], float)
 
     def test_attributes_truncates_rule_id_list(self):
         sink = TelemetrySink()
         rules = tuple(f"RULE{i:03d}" for i in range(20))
-        attrs = sink.attributes(
-            _make_report(rule_ids=rules), tool_name="t", blocked=False)
+        attrs = sink.attributes(_make_report(rule_ids=rules), tool_name="t", blocked=False)
         # Bounded to first 8.
         assert attrs["trpc_agent_sdk.tools.safety.rule_id"].count(",") == 7
 
@@ -67,10 +66,9 @@ class TestTelemetrySink:
         sink = TelemetrySink()
         # Should be a no-op rather than raising.
         sink.record(_make_report(), tool_name="t", blocked=False)
-        sink.record(_make_report(decision=SafetyDecision.DENY,
-                                 risk=RiskLevel.CRITICAL,
-                                 blocked=True),
-                    tool_name="t", blocked=True)
+        sink.record(_make_report(decision=SafetyDecision.DENY, risk=RiskLevel.CRITICAL, blocked=True),
+                    tool_name="t",
+                    blocked=True)
 
 
 def test_get_default_sink_singleton():
@@ -80,6 +78,7 @@ def test_get_default_sink_singleton():
 
 
 class TestBuildAuditEvent:
+
     def test_construct(self):
         report = _make_report()
         event = build_audit_event(

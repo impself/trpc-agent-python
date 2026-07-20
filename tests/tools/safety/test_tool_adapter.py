@@ -20,6 +20,7 @@ from trpc_agent_sdk.tools.safety._tool_adapter import (
 
 
 class TestExtractScalar:
+
     def test_returns_none_when_field_missing(self):
         out = _extract_scalar({"a": 1}, "b", required=False)
         assert out is None
@@ -47,6 +48,7 @@ class TestExtractScalar:
 
 
 class TestExtractMapping:
+
     def test_no_field_name(self):
         assert _extract_mapping({"a": 1}, None) == {}
 
@@ -66,6 +68,7 @@ class TestExtractMapping:
 
 
 class TestExtractSequence:
+
     def test_no_field_name(self):
         assert _extract_sequence({"a": 1}, None) == ()
 
@@ -76,17 +79,18 @@ class TestExtractSequence:
         assert _extract_sequence({"a": None}, "a") == ()
 
     def test_str_wrapped(self):
-        assert _extract_sequence({"a": "ls"}, "a") == ("ls",)
+        assert _extract_sequence({"a": "ls"}, "a") == ("ls", )
 
     def test_list_str(self):
         out = _extract_sequence({"a": ["ls", "-l"]}, "a")
         assert out == ("ls", "-l")
 
     def test_other_stringified(self):
-        assert _extract_sequence({"a": 42}, "a") == ("42",)
+        assert _extract_sequence({"a": 42}, "a") == ("42", )
 
 
 class TestExtractFloat:
+
     def test_no_field_name(self):
         assert _extract_float({"a": 1}, None) is None
 
@@ -105,9 +109,11 @@ class TestExtractFloat:
 
 
 class TestToolInputAdapter:
+
     def test_build_request_minimal(self):
         adapter = ToolInputAdapter(
-            "test", ToolFieldMapping(),
+            "test",
+            ToolFieldMapping(),
             tool_kind=ToolKind.UNKNOWN,
         )
         req = adapter.build_request({})
@@ -138,7 +144,9 @@ class TestToolInputAdapter:
         req = adapter.build_request({
             "code": "print('hi')",
             "cwd": "/tmp",
-            "env": {"X": "1"},
+            "env": {
+                "X": "1"
+            },
             "timeout": 30,
             "argv": ["ls", "-l"],
         })
@@ -162,10 +170,10 @@ class TestToolInputAdapter:
 
 
 class TestBuildDefaultAdapters:
+
     def test_includes_builtin_names(self, default_policy):
         adapters = build_default_adapters(default_policy)
-        for name in ("workspace_exec", "skill_run", "skill_exec",
-                     "python_exec", "bash_exec"):
+        for name in ("workspace_exec", "skill_run", "skill_exec", "python_exec", "bash_exec"):
             assert name in adapters
 
     def test_policy_override_wins(self, make_policy):
@@ -183,34 +191,34 @@ class TestBuildDefaultAdapters:
 
     def test_custom_tool_added(self, default_policy):
         policy = default_policy.model_copy(update={
-            "tools": {"custom_tool": ToolFieldMapping(
-                execution_capable=False,
-                language=ScriptLanguage.BASH,
-            )},
+            "tools": {
+                "custom_tool": ToolFieldMapping(
+                    execution_capable=False,
+                    language=ScriptLanguage.BASH,
+                )
+            },
         })
         adapters = build_default_adapters(policy)
         assert "custom_tool" in adapters
 
 
 class TestResolveAdapter:
+
     def test_builtin_wins(self, default_policy):
         builtin = build_default_adapters(default_policy)
-        adapter = resolve_adapter(
-            "workspace_exec", default_policy, builtin=builtin)
+        adapter = resolve_adapter("workspace_exec", default_policy, builtin=builtin)
         assert adapter.tool_name == "workspace_exec"
         assert adapter.mapping.language == ScriptLanguage.BASH
 
     def test_policy_only(self, make_policy):
         policy = make_policy(tools={
-            "custom_tool": ToolFieldMapping(
-                execution_capable=True, language=ScriptLanguage.PYTHON),
+            "custom_tool": ToolFieldMapping(execution_capable=True, language=ScriptLanguage.PYTHON),
         })
         adapter = resolve_adapter("custom_tool", policy, builtin={})
         assert adapter.mapping.language == ScriptLanguage.PYTHON
 
     def test_unknown_returns_unknown_mapping(self, default_policy):
-        adapter = resolve_adapter("never_declared", default_policy,
-                                  builtin={})
+        adapter = resolve_adapter("never_declared", default_policy, builtin={})
         assert adapter.mapping.language == ScriptLanguage.UNKNOWN
         assert adapter.mapping.execution_capable is False
 

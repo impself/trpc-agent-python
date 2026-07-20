@@ -16,6 +16,7 @@ from trpc_agent_sdk.tools.safety._models import (
 
 
 class TestCwdChecks:
+
     def test_cwd_with_dotdot_denied(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(cwd="/tmp/../../etc")
@@ -43,6 +44,7 @@ class TestCwdChecks:
 
 
 class TestTimeoutChecks:
+
     def test_timeout_within_limit(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(requested_timeout_seconds=30.0)
@@ -63,17 +65,16 @@ class TestTimeoutChecks:
 
 
 class TestArgvChecks:
+
     def test_argv_denied_executable(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(argv=("rm", "-rf", "/x"))
         out = list(rule.scan(req, make_policy()))
         assert any(f.rule_id == "PROC001_PROCESS_EXEC" for f in out)
 
-    def test_argv_unknown_executable_review(
-        self, make_policy, scan_request_factory
-    ):
+    def test_argv_unknown_executable_review(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
-        req = scan_request_factory(argv=("unknownexec",))
+        req = scan_request_factory(argv=("unknownexec", ))
         out = list(rule.scan(req, make_policy()))
         assert any(f.rule_id == "PROC001_PROCESS_EXEC" for f in out)
 
@@ -81,21 +82,20 @@ class TestArgvChecks:
         # Only the executable token is checked; subsequent args are treated
         # as inputs, not executables.
         rule = CrossFieldScannerRule()
-        req = scan_request_factory(argv=("python",))
+        req = scan_request_factory(argv=("python", ))
         out = list(rule.scan(req, make_policy()))
         assert not any(f.rule_id == "PROC001_PROCESS_EXEC" for f in out)
 
     def test_argv_option_skipped(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
-        req = scan_request_factory(argv=("-x",))
+        req = scan_request_factory(argv=("-x", ))
         out = list(rule.scan(req, make_policy()))
         assert not any(f.rule_id == "PROC001_PROCESS_EXEC" for f in out)
 
 
 class TestToolMappingCheck:
-    def test_unknown_execution_capable_tool(
-        self, make_policy, scan_request_factory
-    ):
+
+    def test_unknown_execution_capable_tool(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(
             tool_name="custom_tool",
@@ -104,52 +104,50 @@ class TestToolMappingCheck:
         out = list(rule.scan(req, make_policy()))
         assert any(f.rule_id == "PARSE001_UNCERTAIN" for f in out)
 
-    def test_known_builtin_adapter_no_finding(
-        self, make_policy, scan_request_factory
-    ):
+    def test_known_builtin_adapter_no_finding(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(
             tool_name="workspace_exec",
-            metadata={"execution_capable": True,
-                      "adapter_id": "workspace_exec"},
+            metadata={
+                "execution_capable": True,
+                "adapter_id": "workspace_exec"
+            },
         )
         out = list(rule.scan(req, make_policy()))
         assert not any(f.rule_id == "PARSE001_UNCERTAIN" for f in out)
 
-    def test_policy_declared_adapter_no_finding(
-        self, make_policy, scan_request_factory
-    ):
+    def test_policy_declared_adapter_no_finding(self, make_policy, scan_request_factory):
         from trpc_agent_sdk.tools.safety._policy import ToolFieldMapping
         from trpc_agent_sdk.tools.safety._models import ScriptLanguage
 
-        policy = make_policy(tools={
-            "custom_tool": ToolFieldMapping(
-                execution_capable=True,
-                language=ScriptLanguage.PYTHON,
-                script="code",
-            ),
-        })
+        policy = make_policy(
+            tools={
+                "custom_tool": ToolFieldMapping(
+                    execution_capable=True,
+                    language=ScriptLanguage.PYTHON,
+                    script="code",
+                ),
+            })
         rule = CrossFieldScannerRule()
         req = scan_request_factory(
             tool_name="custom_tool",
-            metadata={"execution_capable": True,
-                      "adapter_id": "custom_tool"},
+            metadata={
+                "execution_capable": True,
+                "adapter_id": "custom_tool"
+            },
         )
         out = list(rule.scan(req, policy))
         assert not any(f.rule_id == "PARSE001_UNCERTAIN" for f in out)
 
-    def test_not_execution_capable_no_finding(
-        self, make_policy, scan_request_factory
-    ):
+    def test_not_execution_capable_no_finding(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
-        req = scan_request_factory(
-            metadata={"execution_capable": False},
-        )
+        req = scan_request_factory(metadata={"execution_capable": False}, )
         out = list(rule.scan(req, make_policy()))
         assert not any(f.rule_id == "PARSE001_UNCERTAIN" for f in out)
 
 
 class TestOutputBudgetCheck:
+
     def test_output_within_budget(self, make_policy, scan_request_factory):
         rule = CrossFieldScannerRule()
         req = scan_request_factory(requested_output_bytes=512)
@@ -164,6 +162,7 @@ class TestOutputBudgetCheck:
 
 
 class TestLooksLikeExecutable:
+
     def test_plain_name(self):
         assert _looks_like_executable("python") is True
 

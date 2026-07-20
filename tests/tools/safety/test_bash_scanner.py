@@ -31,6 +31,7 @@ def _scan(src: str):
 
 
 class TestParseSleep:
+
     def test_plain_seconds(self):
         assert _parse_sleep("5") == 5.0
 
@@ -54,6 +55,7 @@ class TestParseSleep:
 
 
 class TestHostHelpers:
+
     def test_looks_like_host_simple(self):
         assert _looks_like_host("api.example.com") is True
 
@@ -72,6 +74,7 @@ class TestHostHelpers:
 
 
 class TestSecretRef:
+
     def test_token_var(self):
         assert _looks_like_secret_ref("${API_TOKEN}") is True
 
@@ -84,6 +87,7 @@ class TestSecretRef:
 
 
 class TestEnvAssignment:
+
     def test_simple(self):
         assert _looks_like_env_assignment("FOO=bar") is True
 
@@ -101,6 +105,7 @@ class TestEnvAssignment:
 
 
 class TestDdHelpers:
+
     def test_size_bs_count(self):
         assert _extract_dd_size(["bs=1M", "count=2"]) == 2 * 1024 * 1024
 
@@ -130,9 +135,9 @@ class TestDdHelpers:
 
 
 class TestPythonPipInstall:
+
     def test_python_m_pip_install(self):
-        assert _is_python_pip_install("python",
-                                       ["-m", "pip", "install", "x"]) is True
+        assert _is_python_pip_install("python", ["-m", "pip", "install", "x"]) is True
 
     def test_python_no_pip(self):
         assert _is_python_pip_install("python", ["script.py"]) is False
@@ -142,6 +147,7 @@ class TestPythonPipInstall:
 
 
 class TestInterpreterPayload:
+
     def test_dash_c(self):
         assert _interpreter_runs_payload(["-c", "code"]) is True
 
@@ -156,6 +162,7 @@ class TestInterpreterPayload:
 
 
 class TestOffsets:
+
     def test_line_of_first_line(self):
         assert _line_of("hello\nworld", 1) == 1
 
@@ -172,6 +179,7 @@ class TestOffsets:
 
 
 class TestRm:
+
     def test_recursive_rm(self):
         facts = _scan("rm -rf /tmp/x")
         assert facts.file_deletes
@@ -190,6 +198,7 @@ class TestRm:
 
 
 class TestNetwork:
+
     def test_curl_static_url(self):
         facts = _scan("curl https://api.example.com/x")
         assert facts.network_calls
@@ -217,11 +226,11 @@ class TestNetwork:
         # command follows. Use a plain command that survives to the URL
         # catch-all in the generic handler.
         facts = _scan("true https://evil.example.com")
-        assert any(n.target == "evil.example.com"
-                   for n in facts.network_calls)
+        assert any(n.target == "evil.example.com" for n in facts.network_calls)
 
 
 class TestFileRead:
+
     def test_cat_dotenv(self):
         facts = _scan("cat .env")
         assert facts.file_reads
@@ -234,6 +243,7 @@ class TestFileRead:
 
 
 class TestFileWrite:
+
     def test_tee(self):
         facts = _scan("echo hi | tee /tmp/x")
         assert any(w.target == "/tmp/x" for w in facts.file_writes)
@@ -245,6 +255,7 @@ class TestFileWrite:
 
 
 class TestPrivilege:
+
     def test_sudo(self):
         facts = _scan("sudo rm /tmp/x")
         assert facts.privilege_commands
@@ -252,6 +263,7 @@ class TestPrivilege:
 
 
 class TestPackageManager:
+
     def test_pip_install(self):
         facts = _scan("pip install requests")
         assert facts.dependency_installs
@@ -273,6 +285,7 @@ class TestPackageManager:
 
 
 class TestDynamicExec:
+
     def test_eval(self):
         facts = _scan("eval 'rm -rf /'")
         assert facts.dynamic_execs
@@ -308,6 +321,7 @@ class TestDynamicExec:
 
 
 class TestShellOperators:
+
     def test_pipe(self):
         facts = _scan("a | b")
         assert any(o.operator == "|" for o in facts.shell_operators)
@@ -329,6 +343,7 @@ class TestShellOperators:
 
 
 class TestSleep:
+
     def test_static_sleep(self):
         facts = _scan("sleep 5")
         assert facts.long_sleeps
@@ -341,6 +356,7 @@ class TestSleep:
 
 
 class TestLargeWrites:
+
     def test_dd_size_extracted(self):
         facts = _scan("dd if=/dev/zero of=/tmp/x bs=1M count=10")
         assert facts.large_writes
@@ -349,12 +365,14 @@ class TestLargeWrites:
 
 
 class TestForkBomb:
+
     def test_classic_bomb(self):
         facts = _scan(":(){ :|:& };:")
         assert facts.fork_bombs
 
 
 class TestLoops:
+
     def test_while_true(self):
         facts = _scan("while true; do echo hi; done")
         assert facts.unbounded_loops
@@ -365,6 +383,7 @@ class TestLoops:
 
 
 class TestConcurrency:
+
     def test_many_background_jobs(self):
         # 8+ single-amp background jobs trigger concurrency fact
         facts = _scan("a & b & c & d & e & f & g & h &")
@@ -373,6 +392,7 @@ class TestConcurrency:
 
 
 class TestSecretFlowBash:
+
     def test_echo_token(self):
         facts = _scan('echo "$API_TOKEN"')
         assert facts.secret_flows
@@ -384,6 +404,7 @@ class TestSecretFlowBash:
 
 
 class TestLexer:
+
     def test_unbalanced_quote(self):
         lexer = _BashLexer("'unterminated")
         _, errors = lexer.tokenize()
@@ -416,6 +437,7 @@ class TestLexer:
 
 
 class TestEnvAssignmentHandling:
+
     def test_leading_env_stripped(self):
         facts = _scan("FOO=bar ls -l")
         assert facts.process_calls
@@ -428,17 +450,16 @@ class TestEnvAssignmentHandling:
 
 
 class TestBashScannerRule:
+
     def test_skips_when_language_mismatch(self, scan_request_factory):
         rule = BashScannerRule()
-        req = scan_request_factory(
-            language=ScriptLanguage.PYTHON, script="print(1)")
+        req = scan_request_factory(language=ScriptLanguage.PYTHON, script="print(1)")
         out = list(rule.scan(req, _make_min_policy()))
         assert out == []
 
     def test_emits_finding_for_dangerous(self, scan_request_factory):
         rule = BashScannerRule()
-        req = scan_request_factory(
-            language=ScriptLanguage.BASH, script="rm -rf /tmp")
+        req = scan_request_factory(language=ScriptLanguage.BASH, script="rm -rf /tmp")
         out = list(rule.scan(req, _make_min_policy()))
         assert any(f.rule_id == "FILE001_RECURSIVE_DELETE" for f in out)
 

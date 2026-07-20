@@ -28,6 +28,7 @@ def _scan(src: str) -> ScriptFacts:
 
 
 class TestParseErrors:
+
     def test_syntax_error_recorded(self):
         facts = _scan("""
             def broken(:
@@ -43,6 +44,7 @@ class TestParseErrors:
 
 
 class TestFileDeletes:
+
     def test_shutil_rmtree_recursive(self):
         facts = _scan("""
             import shutil
@@ -89,6 +91,7 @@ class TestFileDeletes:
 
 
 class TestFileWrites:
+
     def test_open_write_mode(self):
         facts = _scan("""
             with open('/tmp/x', 'w') as f:
@@ -136,6 +139,7 @@ class TestFileWrites:
 
 
 class TestFileReads:
+
     def test_open_credential_ssh(self):
         facts = _scan("""
             open('/home/me/.ssh/id_rsa')
@@ -190,6 +194,7 @@ class TestFileReads:
 
 
 class TestNetworkCalls:
+
     def test_requests_get_static(self):
         facts = _scan("""
             import requests
@@ -250,6 +255,7 @@ class TestNetworkCalls:
 
 
 class TestProcessCalls:
+
     def test_subprocess_run_list(self):
         facts = _scan("""
             import subprocess
@@ -267,8 +273,7 @@ class TestProcessCalls:
         # shell=True flag is captured as True; shell_operator fact emitted
         assert facts.process_calls
         assert facts.process_calls[0].shell is True
-        assert any("shell=True" in op.operator
-                   for op in facts.shell_operators)
+        assert any("shell=True" in op.operator for op in facts.shell_operators)
 
     def test_subprocess_with_pipe_operator(self):
         facts = _scan("""
@@ -336,6 +341,7 @@ class TestProcessCalls:
 
 
 class TestDynamicExec:
+
     def test_eval(self):
         facts = _scan("""
             eval('1+1')
@@ -379,6 +385,7 @@ class TestDynamicExec:
 
 
 class TestSleep:
+
     def test_static_duration(self):
         facts = _scan("""
             import time
@@ -405,6 +412,7 @@ class TestSleep:
 
 
 class TestConcurrency:
+
     def test_threading_thread(self):
         facts = _scan("""
             import threading
@@ -445,6 +453,7 @@ class TestConcurrency:
 
 
 class TestSecretFlow:
+
     def test_env_taint_to_print(self):
         facts = _scan("""
             import os
@@ -483,6 +492,7 @@ class TestSecretFlow:
 
 
 class TestLoops:
+
     def test_while_true_no_break(self):
         facts = _scan("""
             while True:
@@ -508,6 +518,7 @@ class TestLoops:
 
 
 class TestModuleHelpers:
+
     def test_format_string_constant(self):
         assert _format_string(ast.parse("'x'", mode="eval").body) == "x"
 
@@ -571,16 +582,18 @@ class TestModuleHelpers:
         assert _SHELL_OPERATORS_IN("plain") == []
 
     def test_src_segment_returns_empty_for_no_lineno(self):
+
         class FakeNode:
             pass
+
         assert _src_segment("x", FakeNode()) == ""
 
 
 class TestPythonScannerRule:
+
     def test_skips_when_language_mismatch(self, scan_request_factory):
         rule = PythonScannerRule()
-        req = scan_request_factory(
-            language=ScriptLanguage.BASH, script="echo hi")
+        req = scan_request_factory(language=ScriptLanguage.BASH, script="echo hi")
         out = list(rule.scan(req, _make_min_policy()))
         assert out == []
 
@@ -636,8 +649,7 @@ class TestScannerEdgeCases:
         """)
         # Write via aliased Path() is not currently detected; assert no
         # false positives at least.
-        assert all("/tmp/x" != w.target or w.target == "/tmp/x"
-                   for w in facts.file_writes)
+        assert all("/tmp/x" != w.target or w.target == "/tmp/x" for w in facts.file_writes)
 
     def test_open_with_kwargs_mode(self):
         facts = _scan("""

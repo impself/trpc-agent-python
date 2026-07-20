@@ -47,10 +47,10 @@ def _make_filter(**overrides) -> ToolScriptSafetyFilter:
 
 
 class TestCheck:
+
     def test_safe_python_returns_allow(self):
         flt = _make_filter()
-        decision, report = flt.check(
-            "python_exec", {"code": "print('hi')"})
+        decision, report = flt.check("python_exec", {"code": "print('hi')"})
         assert decision == SafetyDecision.ALLOW
         assert report.findings == ()
 
@@ -71,20 +71,20 @@ class TestCheck:
             tool_kind=ToolKind.UNKNOWN,
         )
         # No script in custom mapping -> empty script -> allow.
-        assert decision in (SafetyDecision.ALLOW,
-                            SafetyDecision.NEEDS_HUMAN_REVIEW)
+        assert decision in (SafetyDecision.ALLOW, SafetyDecision.NEEDS_HUMAN_REVIEW)
 
 
 class TestCheckAsync:
+
     @pytest.mark.asyncio
     async def test_async_check(self):
         flt = _make_filter()
-        decision, _ = await flt.check_async(
-            "python_exec", {"code": "print('hi')"})
+        decision, _ = await flt.check_async("python_exec", {"code": "print('hi')"})
         assert decision == SafetyDecision.ALLOW
 
 
 class TestEnforce:
+
     def test_enforce_blocks_on_deny(self):
         flt = _make_filter()
         with pytest.raises(BlockedExecutionError):
@@ -95,8 +95,7 @@ class TestEnforce:
 
     def test_enforce_returns_report_on_allow(self):
         flt = _make_filter()
-        report = flt.enforce(
-            "python_exec", {"code": "print('hi')"})
+        report = flt.enforce("python_exec", {"code": "print('hi')"})
         assert report.decision == SafetyDecision.ALLOW
 
     def test_enforce_request_request_object(self):
@@ -112,6 +111,7 @@ class TestEnforce:
 
 
 class TestEnforceAsync:
+
     @pytest.mark.asyncio
     async def test_enforce_async_blocks(self):
         flt = _make_filter()
@@ -124,12 +124,12 @@ class TestEnforceAsync:
     @pytest.mark.asyncio
     async def test_enforce_async_allows(self):
         flt = _make_filter()
-        report = await flt.enforce_async(
-            "python_exec", {"code": "print('hi')"})
+        report = await flt.enforce_async("python_exec", {"code": "print('hi')"})
         assert report.decision == SafetyDecision.ALLOW
 
 
 class TestHumanReviewBlocking:
+
     def test_review_blocks_by_default(self):
         # dynamic exec triggers NEEDS_HUMAN_REVIEW by default
         flt = _make_filter()
@@ -140,24 +140,24 @@ class TestHumanReviewBlocking:
             )
 
     def test_review_passes_when_disabled(self):
-        flt = _make_filter(
-            defaults={"human_review_blocks_execution": False})
+        flt = _make_filter(defaults={"human_review_blocks_execution": False})
         report = flt.enforce(
             "python_exec",
             {"code": "eval('1+1')"},
         )
         # Doesn't raise; report carries NEEDS_HUMAN_REVIEW
-        assert SafetyDecision.NEEDS_HUMAN_REVIEW in (
-            report.decision, SafetyDecision.NEEDS_HUMAN_REVIEW)
+        assert SafetyDecision.NEEDS_HUMAN_REVIEW in (report.decision, SafetyDecision.NEEDS_HUMAN_REVIEW)
 
 
 class TestFilterDuckHooks:
+
     @pytest.mark.asyncio
     async def test_before_blocks_dangerous(self):
         flt = _make_filter()
 
         class Ctx:
             tool_name = "python_exec"
+
         ctx = Ctx()
         req = {"code": "import shutil\nshutil.rmtree('/x')"}
         rsp: dict = {}
@@ -174,6 +174,7 @@ class TestFilterDuckHooks:
 
         class Ctx:
             tool_name = "python_exec"
+
         ctx = Ctx()
         req = {"code": "print('hi')"}
         rsp: dict = {}
@@ -187,6 +188,7 @@ class TestFilterDuckHooks:
 
         class Ctx:
             tool_name = "bash_exec"
+
         ctx = Ctx()
         req = "echo hi"
         rsp: dict = {}
@@ -203,13 +205,14 @@ class TestFilterDuckHooks:
 
 
 class TestBlocksExecution:
+
     def test_deny_blocks(self):
         flt = _make_filter()
         report = SafetyReport(
             report_id="r",
             decision=SafetyDecision.DENY,
             risk_level=RiskLevel.HIGH,
-            rule_ids=("X",),
+            rule_ids=("X", ),
             findings=(),
             recommendation="",
             policy_hash="",
@@ -226,7 +229,7 @@ class TestBlocksExecution:
             report_id="r",
             decision=SafetyDecision.ALLOW,
             risk_level=RiskLevel.INFO,
-            rule_ids=("X",),
+            rule_ids=("X", ),
             findings=(),
             recommendation="",
             policy_hash="",
@@ -239,6 +242,7 @@ class TestBlocksExecution:
 
 
 class TestRunSyncInsideEventLoop:
+
     @pytest.mark.asyncio
     async def test_raises_when_loop_running(self):
         flt = _make_filter()
@@ -247,39 +251,36 @@ class TestRunSyncInsideEventLoop:
 
 
 class TestModuleHelpers:
+
     def test_looks_like_args_dict_mapping(self):
         assert _looks_like_args_dict({"a": 1}) is True
         assert _looks_like_args_dict("x") is False
 
     def test_build_request_from_raw_string(self):
-        adapter = ToolInputAdapter(
-            "x", ToolFieldMapping(language=ScriptLanguage.BASH))
-        req = _build_request_from_raw(
-            "x", ToolKind.UNKNOWN, "echo hi", adapter)
+        adapter = ToolInputAdapter("x", ToolFieldMapping(language=ScriptLanguage.BASH))
+        req = _build_request_from_raw("x", ToolKind.UNKNOWN, "echo hi", adapter)
         assert req.script == "echo hi"
         assert req.language == ScriptLanguage.BASH
 
     def test_build_request_from_raw_mapping(self):
         adapter = ToolInputAdapter(
-            "python_exec",
-            ToolFieldMapping(execution_capable=True,
-                             language=ScriptLanguage.PYTHON,
-                             script="code"))
-        req = _build_request_from_raw(
-            "python_exec", ToolKind.UNKNOWN, {"code": "print(1)"}, adapter)
+            "python_exec", ToolFieldMapping(execution_capable=True, language=ScriptLanguage.PYTHON, script="code"))
+        req = _build_request_from_raw("python_exec", ToolKind.UNKNOWN, {"code": "print(1)"}, adapter)
         assert req.script == "print(1)"
 
     def test_build_request_from_raw_invalid_type(self):
         adapter = ToolInputAdapter("x", ToolFieldMapping())
         with pytest.raises(ToolRequestError):
-            _build_request_from_raw(
-                "x", ToolKind.UNKNOWN, 123, adapter)
+            _build_request_from_raw("x", ToolKind.UNKNOWN, 123, adapter)
 
     def test_resolve_tool_name_priority(self):
+
         class Req:
             tool_name = "from_req"
+
         class Ctx:
             name = "from_ctx"
+
         assert _resolve_tool_name(Ctx(), Req()) == "from_req"
         assert _resolve_tool_name("plain_string", Req()) == "from_req"
         assert _resolve_tool_name(None, None) == "unknown"
@@ -291,6 +292,7 @@ class TestModuleHelpers:
 
         class HasArgs:
             arguments = {"y": 2}
+
         assert _resolve_args(HasArgs()) == {"y": 2}
 
         # string input gets wrapped under "command"
@@ -299,21 +301,28 @@ class TestModuleHelpers:
         # empty fallback
         class Empty:
             pass
+
         assert _resolve_args(Empty()) == {}
 
     def test_resolve_tool_kind_from_object(self):
+
         class Ctx:
             tool_kind = ToolKind.MCP
+
         assert _resolve_tool_kind(Ctx(), None) == ToolKind.MCP
 
     def test_resolve_tool_kind_from_string(self):
+
         class Ctx:
             tool_kind = "tool"
+
         assert _resolve_tool_kind(Ctx(), None) == ToolKind.TOOL
 
     def test_resolve_tool_kind_invalid_string(self):
+
         class Ctx:
             tool_kind = "bogus"
+
         # Invalid string falls through to UNKNOWN
         assert _resolve_tool_kind(Ctx(), None) == ToolKind.UNKNOWN
 
@@ -321,8 +330,10 @@ class TestModuleHelpers:
         assert _resolve_tool_kind(None, None) == ToolKind.UNKNOWN
 
     def test_set_filter_continue_object(self):
+
         class Rsp:
             is_continue: bool = True
+
         rsp = Rsp()
         _set_filter_continue(rsp, False)
         assert rsp.is_continue is False
@@ -337,8 +348,10 @@ class TestModuleHelpers:
         _set_filter_continue(None, True)
 
     def test_set_filter_rsp_object(self):
+
         class Rsp:
             rsp: dict = {}
+
         rsp = Rsp()
         _set_filter_rsp(rsp, {"k": "v"})
         assert rsp.rsp == {"k": "v"}
@@ -353,23 +366,24 @@ class TestModuleHelpers:
 
     def test_render_block_shape(self):
         from trpc_agent_sdk.tools.safety._models import (
-            Evidence, RiskCategory, RiskLevel, SafetyFinding,
+            Evidence,
+            RiskCategory,
+            RiskLevel,
+            SafetyFinding,
         )
         report = SafetyReport(
             report_id="r",
             decision=SafetyDecision.DENY,
             risk_level=RiskLevel.HIGH,
-            rule_ids=("X",),
-            findings=(
-                SafetyFinding(
-                    rule_id="X",
-                    category=RiskCategory.FILE,
-                    risk_level=RiskLevel.HIGH,
-                    decision=SafetyDecision.DENY,
-                    evidence=Evidence(snippet="x"),
-                    recommendation="don't",
-                ),
-            ),
+            rule_ids=("X", ),
+            findings=(SafetyFinding(
+                rule_id="X",
+                category=RiskCategory.FILE,
+                risk_level=RiskLevel.HIGH,
+                decision=SafetyDecision.DENY,
+                evidence=Evidence(snippet="x"),
+                recommendation="don't",
+            ), ),
             recommendation="block",
             policy_hash="p",
             policy_version="1",
@@ -385,16 +399,21 @@ class TestModuleHelpers:
 
 
 class TestRecordReportFailClosed:
+
     @pytest.mark.asyncio
     async def test_audit_required_blocks_on_emit_failure(self):
         # Build a sink that always raises SafetyAuditError.
         from trpc_agent_sdk.tools.safety._audit import AuditSink
         from trpc_agent_sdk.tools.safety._exceptions import SafetyAuditError
         from trpc_agent_sdk.tools.safety._models import (
-            SafetyAuditEvent, RiskLevel, SafetyDecision, ToolKind,
+            SafetyAuditEvent,
+            RiskLevel,
+            SafetyDecision,
+            ToolKind,
         )
 
         class FailingSink:
+
             async def emit(self, event):
                 raise SafetyAuditError("disk on fire")
 
@@ -418,6 +437,7 @@ class TestRecordReportFailClosed:
         from trpc_agent_sdk.tools.safety._exceptions import SafetyAuditError
 
         class FailingSink:
+
             async def emit(self, event):
                 raise SafetyAuditError("disk on fire")
 

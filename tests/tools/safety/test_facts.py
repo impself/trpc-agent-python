@@ -27,6 +27,7 @@ from trpc_agent_sdk.tools.safety._models import ScriptLanguage
 
 
 class TestLoc:
+
     def test_defaults(self):
         loc = Loc()
         assert loc.label() == ""
@@ -42,6 +43,7 @@ class TestLoc:
 
 
 class TestFactDataclasses:
+
     def test_fact_base_fields(self):
         f = Fact(snippet="x", loc=Loc(line=1, column=2))
         assert f.snippet == "x"
@@ -72,28 +74,29 @@ class TestFactDataclasses:
 
 
 class TestScriptFacts:
+
     def test_defaults(self):
         sf = ScriptFacts()
         assert sf.language == ScriptLanguage.UNKNOWN
         assert sf.has_any() is False
 
     def test_has_any_with_finding(self):
-        sf = ScriptFacts(file_deletes=(FileDeleteFact(target="/x"),))
+        sf = ScriptFacts(file_deletes=(FileDeleteFact(target="/x"), ))
         assert sf.has_any() is True
 
     def test_has_any_with_parse_error(self):
-        sf = ScriptFacts(parse_errors=(ParseErrorFact(message="e"),))
+        sf = ScriptFacts(parse_errors=(ParseErrorFact(message="e"), ))
         assert sf.has_any() is True
 
     def test_merge_combines_lists(self):
         a = ScriptFacts(
-            file_deletes=(FileDeleteFact(target="/a"),),
-            network_calls=(NetworkFact(target="a.com"),),
+            file_deletes=(FileDeleteFact(target="/a"), ),
+            network_calls=(NetworkFact(target="a.com"), ),
         )
         b = ScriptFacts(
-            file_deletes=(FileDeleteFact(target="/b"),),
-            network_calls=(NetworkFact(target="b.com"),),
-            privilege_commands=(PrivilegeFact(command="sudo"),),
+            file_deletes=(FileDeleteFact(target="/b"), ),
+            network_calls=(NetworkFact(target="b.com"), ),
+            privilege_commands=(PrivilegeFact(command="sudo"), ),
         )
         merged = a.merge(b)
         assert len(merged.file_deletes) == 2
@@ -113,23 +116,21 @@ class TestScriptFacts:
     def test_full_fact_bag_round_trips(self):
         sf = ScriptFacts(
             language=ScriptLanguage.PYTHON,
-            file_deletes=(FileDeleteFact(target="/x", recursive=True),),
-            file_writes=(FileWriteFact(target="/y"),),
-            file_reads=(FileReadFact(target="/z", kind="credential"),),
-            network_calls=(NetworkFact(target="api.example.com"),),
-            process_calls=(ProcessFact(command="ls"),),
-            shell_operators=(ShellOperatorFact(operator="&&"),),
-            privilege_commands=(PrivilegeFact(command="sudo"),),
-            dependency_installs=(
-                DependencyInstallFact(manager="pip", command="pip install x"),),
-            unbounded_loops=(UnboundedLoopFact(kind="while-True"),),
-            fork_bombs=(ForkBombFact(pattern="classic"),),
-            long_sleeps=(LongSleepFact(duration_seconds=10.0, raw="10"),),
-            concurrency=(ConcurrencyFact(count=2, raw="threading.Thread"),),
-            large_writes=(LargeWriteFact(size=10, target="/f"),),
-            secret_flows=(SecretFlowFact(source="s", sink="print",
-                                         sink_kind="output"),),
-            dynamic_execs=(DynamicExecFact(kind="eval"),),
-            parse_errors=(ParseErrorFact(message="bad"),),
+            file_deletes=(FileDeleteFact(target="/x", recursive=True), ),
+            file_writes=(FileWriteFact(target="/y"), ),
+            file_reads=(FileReadFact(target="/z", kind="credential"), ),
+            network_calls=(NetworkFact(target="api.example.com"), ),
+            process_calls=(ProcessFact(command="ls"), ),
+            shell_operators=(ShellOperatorFact(operator="&&"), ),
+            privilege_commands=(PrivilegeFact(command="sudo"), ),
+            dependency_installs=(DependencyInstallFact(manager="pip", command="pip install x"), ),
+            unbounded_loops=(UnboundedLoopFact(kind="while-True"), ),
+            fork_bombs=(ForkBombFact(pattern="classic"), ),
+            long_sleeps=(LongSleepFact(duration_seconds=10.0, raw="10"), ),
+            concurrency=(ConcurrencyFact(count=2, raw="threading.Thread"), ),
+            large_writes=(LargeWriteFact(size=10, target="/f"), ),
+            secret_flows=(SecretFlowFact(source="s", sink="print", sink_kind="output"), ),
+            dynamic_execs=(DynamicExecFact(kind="eval"), ),
+            parse_errors=(ParseErrorFact(message="bad"), ),
         )
         assert sf.has_any() is True

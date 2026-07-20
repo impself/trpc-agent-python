@@ -54,6 +54,7 @@ def _finding(rule_id: str = "X",
 
 
 class TestScan:
+
     def test_safe_request_returns_allow(self, scan_request_factory):
         guard = ToolSafetyGuard(_policy())
         req = scan_request_factory(
@@ -85,9 +86,7 @@ class TestScan:
         report = guard.scan(req)
         assert report.decision == SafetyDecision.DENY
 
-    def test_oversized_script_records_size_error(
-        self, scan_request_factory
-    ):
+    def test_oversized_script_records_size_error(self, scan_request_factory):
         guard = ToolSafetyGuard(_policy(limits={"max_script_bytes": 8}))
         req = scan_request_factory(
             language=ScriptLanguage.PYTHON,
@@ -95,10 +94,8 @@ class TestScan:
         )
         report = guard.scan(req)
         assert report.decision == SafetyDecision.DENY
-        assert any("script exceeds" in f.evidence.snippet
-                   or "scannererror" in f.evidence.snippet.lower()
-                   or "SafetyScannerError" in f.evidence.snippet
-                   or f.rule_id == INTERNAL_ERROR_RULE_ID
+        assert any("script exceeds" in f.evidence.snippet or "scannererror" in f.evidence.snippet.lower()
+                   or "SafetyScannerError" in f.evidence.snippet or f.rule_id == INTERNAL_ERROR_RULE_ID
                    for f in report.findings)
 
     def test_zero_limit_skips_size_check(self, scan_request_factory):
@@ -109,11 +106,11 @@ class TestScan:
         )
         report = guard.scan(req)
         # No internal error from size; just a normal scan result.
-        assert all(f.rule_id != INTERNAL_ERROR_RULE_ID
-                   for f in report.findings)
+        assert all(f.rule_id != INTERNAL_ERROR_RULE_ID for f in report.findings)
 
 
 class TestErrorReport:
+
     def test_error_report_always_fail_closed(self, scan_request_factory):
         guard = ToolSafetyGuard(_policy())
         req = scan_request_factory()
@@ -122,40 +119,45 @@ class TestErrorReport:
         assert report.findings
         assert report.findings[0].rule_id == INTERNAL_ERROR_RULE_ID
 
-    def test_error_report_respects_guard_error_policy(
-        self, scan_request_factory
-    ):
-        guard = ToolSafetyGuard(
-            _policy(defaults={"guard_error": "needs_human_review"}))
+    def test_error_report_respects_guard_error_policy(self, scan_request_factory):
+        guard = ToolSafetyGuard(_policy(defaults={"guard_error": "needs_human_review"}))
         req = scan_request_factory()
         report = guard.error_report(req, RuntimeError("boom"))
         assert report.decision == SafetyDecision.NEEDS_HUMAN_REVIEW
 
 
 class TestRuleValidation:
+
     def test_duplicate_rule_ids_rejected(self):
+
         class Bad:
             rule_id = "dup"
+
             def scan(self, req, pol):
                 return []
+
         with pytest.raises(SafetyGuardError):
             ToolSafetyGuard(_policy(), rules=[Bad(), Bad()])
 
     def test_missing_rule_id_rejected(self):
+
         class Bad:
             rule_id = ""
+
             def scan(self, req, pol):
                 return []
+
         with pytest.raises(SafetyGuardError):
             ToolSafetyGuard(_policy(), rules=[Bad()])
 
     def test_custom_rules_used(self, scan_request_factory):
+
         class MyRule:
             rule_id = "my_rule"
+
             def scan(self, req, pol):
-                yield _finding(rule_id="MY001",
-                               decision=SafetyDecision.DENY,
-                               risk=RiskLevel.HIGH)
+                yield _finding(rule_id="MY001", decision=SafetyDecision.DENY, risk=RiskLevel.HIGH)
+
         guard = ToolSafetyGuard(_policy(), rules=[MyRule()])
         req = scan_request_factory()
         report = guard.scan(req)
@@ -163,6 +165,7 @@ class TestRuleValidation:
 
 
 class TestRuleProperty:
+
     def test_returns_copy(self):
         guard = ToolSafetyGuard(_policy())
         first = guard.rules
@@ -172,6 +175,7 @@ class TestRuleProperty:
 
 
 class TestPolicyHashStable:
+
     def test_same_policy_same_hash(self):
         a = ToolSafetyGuard(_policy())
         b = ToolSafetyGuard(_policy())
@@ -180,6 +184,7 @@ class TestPolicyHashStable:
 
 
 class TestAggregationHelpers:
+
     def test_aggregate_decision_returns_worst(self):
         out = _aggregate_decision([
             _finding(decision=SafetyDecision.ALLOW),
@@ -228,6 +233,7 @@ class TestAggregationHelpers:
 
 
 class TestDeduplicate:
+
     def test_removes_exact_duplicates(self):
         f1 = _finding()
         f2 = _finding()
@@ -249,6 +255,7 @@ class TestDeduplicate:
 
 
 class TestReportId:
+
     def test_report_id_prefix(self):
         rid = _new_report_id()
         assert rid.startswith("rep-")

@@ -27,6 +27,7 @@ from trpc_agent_sdk.tools.safety._models import (
 
 
 class TestEnums:
+
     def test_tool_kind_values(self):
         assert ToolKind.TOOL.value == "tool"
         assert ToolKind.MCP.value == "mcp"
@@ -51,12 +52,12 @@ class TestEnums:
         assert RiskLevel.LOW.label() == "low"
 
     def test_risk_category_values(self):
-        for cat in ("FILE", "NETWORK", "PROCESS", "DEPENDENCY",
-                    "RESOURCE", "SECRET", "ANALYSIS", "SAFE"):
+        for cat in ("FILE", "NETWORK", "PROCESS", "DEPENDENCY", "RESOURCE", "SECRET", "ANALYSIS", "SAFE"):
             assert RiskCategory[cat].value == cat.lower()
 
 
 class TestEvidence:
+
     def test_defaults(self):
         ev = Evidence()
         assert ev.snippet == ""
@@ -78,6 +79,7 @@ class TestEvidence:
 
 
 class TestSafetyScanRequest:
+
     def test_minimal_construction(self):
         req = SafetyScanRequest(tool_name="t")
         assert req.tool_name == "t"
@@ -106,8 +108,7 @@ class _FindingBuilder:
     """Tiny helper to fabricate findings without dragging in the redactor."""
 
     @staticmethod
-    def build(rule_id: str, decision: SafetyDecision,
-              risk: RiskLevel = RiskLevel.MEDIUM) -> SafetyFinding:
+    def build(rule_id: str, decision: SafetyDecision, risk: RiskLevel = RiskLevel.MEDIUM) -> SafetyFinding:
         return SafetyFinding(
             rule_id=rule_id,
             category=RiskCategory.ANALYSIS,
@@ -119,6 +120,7 @@ class _FindingBuilder:
 
 
 class TestAggregationHelpers:
+
     def test_aggregate_decision_empty(self):
         assert _aggregate_decision([]) == SafetyDecision.ALLOW
 
@@ -180,12 +182,13 @@ class TestAggregationHelpers:
 
 
 class TestSafetyReport:
+
     def test_frozen(self):
         rep = SafetyReport(
             report_id="r",
             decision=SafetyDecision.ALLOW,
             risk_level=RiskLevel.INFO,
-            rule_ids=("SAFE000",),
+            rule_ids=("SAFE000", ),
             findings=(),
             recommendation="ok",
             policy_hash="p",
@@ -203,7 +206,7 @@ class TestSafetyReport:
                 report_id="r",
                 decision=SafetyDecision.ALLOW,
                 risk_level=RiskLevel.INFO,
-                rule_ids=("SAFE000",),
+                rule_ids=("SAFE000", ),
                 findings=(),
                 recommendation="ok",
                 policy_hash="p",
@@ -223,17 +226,15 @@ class TestSafetyReport:
             scan_duration_ms=1.0,
         )
         assert rep.decision == SafetyDecision.ALLOW
-        assert rep.rule_ids == (SAFE_RULE_ID,)
+        assert rep.rule_ids == (SAFE_RULE_ID, )
 
     def test_combine_picks_worst(self):
         rep1 = SafetyReport(
             report_id="r1",
             decision=SafetyDecision.ALLOW,
             risk_level=RiskLevel.LOW,
-            rule_ids=("A",),
-            findings=(
-                _FindingBuilder.build("A", SafetyDecision.ALLOW, RiskLevel.LOW),
-            ),
+            rule_ids=("A", ),
+            findings=(_FindingBuilder.build("A", SafetyDecision.ALLOW, RiskLevel.LOW), ),
             recommendation="ok",
             policy_hash="p",
             policy_version="1",
@@ -245,11 +246,8 @@ class TestSafetyReport:
             report_id="r2",
             decision=SafetyDecision.DENY,
             risk_level=RiskLevel.CRITICAL,
-            rule_ids=("B",),
-            findings=(
-                _FindingBuilder.build(
-                    "B", SafetyDecision.DENY, RiskLevel.CRITICAL),
-            ),
+            rule_ids=("B", ),
+            findings=(_FindingBuilder.build("B", SafetyDecision.DENY, RiskLevel.CRITICAL), ),
             recommendation="ok",
             policy_hash="p",
             policy_version="1",
@@ -269,12 +267,12 @@ class TestSafetyReport:
         assert combined.rule_ids == ("A", "B")
         assert combined.redacted is True
         # Combined sha is sha256 of "\n".join(hashes)
-        expected_sha = hashlib.sha256(
-            b"a\nb").hexdigest()
+        expected_sha = hashlib.sha256(b"a\nb").hexdigest()
         assert combined.script_sha256 == expected_sha
 
 
 class TestSafetyAuditEvent:
+
     def test_construct(self):
         ev = SafetyAuditEvent(
             event_id="e",
@@ -284,7 +282,7 @@ class TestSafetyAuditEvent:
             tool_kind=ToolKind.UNKNOWN,
             decision=SafetyDecision.ALLOW,
             risk_level=RiskLevel.INFO,
-            rule_ids=("SAFE000",),
+            rule_ids=("SAFE000", ),
             duration_ms=0.5,
             redacted=False,
             execution_blocked=False,

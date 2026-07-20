@@ -88,6 +88,7 @@ def _ids(findings: Iterable[SafetyFinding]) -> set[str]:
 
 
 class TestResolveDecision:
+
     def test_no_override_returns_proposed(self):
         p = _policy()
         assert resolve_decision("X", SafetyDecision.DENY, p) \
@@ -116,6 +117,7 @@ class TestResolveDecision:
 
 
 class TestDefaultUnknown:
+
     def test_review(self):
         p = _policy()
         assert _default_unknown(p) == SafetyDecision.NEEDS_HUMAN_REVIEW
@@ -130,32 +132,24 @@ class TestDefaultUnknown:
 
 
 class TestFileRecursiveDelete:
+
     def test_recursive_delete_denied(self):
-        facts = ScriptFacts(file_deletes=(
-            FileDeleteFact(recursive=True, target="/x"),
-        ))
-        out = check_file_recursive_delete(facts, _policy(),
-                                          ScriptLanguage.PYTHON,
-                                          _redactor())
+        facts = ScriptFacts(file_deletes=(FileDeleteFact(recursive=True, target="/x"), ))
+        out = check_file_recursive_delete(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"FILE001_RECURSIVE_DELETE"}
         assert out[0].decision == SafetyDecision.DENY
         assert out[0].risk_level == RiskLevel.CRITICAL
 
     def test_non_recursive_skipped(self):
-        facts = ScriptFacts(file_deletes=(
-            FileDeleteFact(recursive=False),
-        ))
-        out = check_file_recursive_delete(facts, _policy(),
-                                          ScriptLanguage.PYTHON,
-                                          _redactor())
+        facts = ScriptFacts(file_deletes=(FileDeleteFact(recursive=False), ))
+        out = check_file_recursive_delete(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
 
 class TestFileDeniedWrite:
+
     def test_denied_path(self):
-        facts = ScriptFacts(file_writes=(
-            FileWriteFact(target="/etc/x", explicit=True),
-        ))
+        facts = ScriptFacts(file_writes=(FileWriteFact(target="/etc/x", explicit=True), ))
         out = check_file_denied_write(
             facts,
             _policy(paths={"deny": ["/etc/**"]}),
@@ -166,82 +160,55 @@ class TestFileDeniedWrite:
         assert out[0].decision == SafetyDecision.DENY
 
     def test_safe_path_no_finding(self):
-        facts = ScriptFacts(file_writes=(
-            FileWriteFact(target="/tmp/x", explicit=True),
-        ))
-        out = check_file_denied_write(facts, _policy(),
-                                      ScriptLanguage.PYTHON,
-                                      _redactor())
+        facts = ScriptFacts(file_writes=(FileWriteFact(target="/tmp/x", explicit=True), ))
+        out = check_file_denied_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_dynamic_target_review(self):
-        facts = ScriptFacts(file_writes=(
-            FileWriteFact(target="<dynamic>", explicit=False),
-        ))
-        out = check_file_denied_write(facts, _policy(),
-                                      ScriptLanguage.PYTHON,
-                                      _redactor())
+        facts = ScriptFacts(file_writes=(FileWriteFact(target="<dynamic>", explicit=False), ))
+        out = check_file_denied_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"FILE002_DENIED_WRITE"}
 
     def test_dynamic_target_on_denied_path(self):
         # If dynamic but matches a denied path glob (it won't here), rule
         # still emits review for the dynamic case.
-        facts = ScriptFacts(file_writes=(
-            FileWriteFact(target="<dynamic>", explicit=False),
-        ))
-        out = check_file_denied_write(facts, _policy(),
-                                      ScriptLanguage.PYTHON,
-                                      _redactor())
+        facts = ScriptFacts(file_writes=(FileWriteFact(target="<dynamic>", explicit=False), ))
+        out = check_file_denied_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         # Always review on dynamic.
         assert out
 
 
 class TestCredentialRead:
+
     def test_credential_read(self):
-        facts = ScriptFacts(file_reads=(
-            FileReadFact(target="/home/x/.ssh/id_rsa", kind="credential"),
-        ))
-        out = check_file_credential_read(facts, _policy(),
-                                         ScriptLanguage.PYTHON,
-                                         _redactor())
+        facts = ScriptFacts(file_reads=(FileReadFact(target="/home/x/.ssh/id_rsa", kind="credential"), ))
+        out = check_file_credential_read(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"FILE003_CREDENTIAL_READ"}
         assert out[0].risk_level == RiskLevel.CRITICAL
 
     def test_regular_read_skipped(self):
-        facts = ScriptFacts(file_reads=(
-            FileReadFact(target="/tmp/x", kind="regular"),
-        ))
-        out = check_file_credential_read(facts, _policy(),
-                                         ScriptLanguage.PYTHON,
-                                         _redactor())
+        facts = ScriptFacts(file_reads=(FileReadFact(target="/tmp/x", kind="regular"), ))
+        out = check_file_credential_read(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
 
 class TestDotenvRead:
+
     def test_dotenv_read(self):
-        facts = ScriptFacts(file_reads=(
-            FileReadFact(target=".env", kind="dotenv"),
-        ))
-        out = check_file_dotenv_read(facts, _policy(),
-                                     ScriptLanguage.BASH,
-                                     _redactor())
+        facts = ScriptFacts(file_reads=(FileReadFact(target=".env", kind="dotenv"), ))
+        out = check_file_dotenv_read(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert _ids(out) == {"FILE004_DOTENV_READ"}
 
     def test_non_dotenv_skipped(self):
-        facts = ScriptFacts(file_reads=(
-            FileReadFact(target="/tmp/x", kind="regular"),
-        ))
-        out = check_file_dotenv_read(facts, _policy(),
-                                     ScriptLanguage.BASH,
-                                     _redactor())
+        facts = ScriptFacts(file_reads=(FileReadFact(target="/tmp/x", kind="regular"), ))
+        out = check_file_dotenv_read(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert out == []
 
 
 class TestNetworkAllowlist:
+
     def test_non_allowlisted_host(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="evil.example.com", library="requests"),
-        ))
+        facts = ScriptFacts(network_calls=(NetworkFact(target="evil.example.com", library="requests"), ))
         out = check_network_non_allowlist(
             facts,
             _policy(network={"allow_domains": ["api.example.com"]}),
@@ -251,9 +218,7 @@ class TestNetworkAllowlist:
         assert _ids(out) == {"NET001_DOMAIN_NOT_ALLOWED"}
 
     def test_allowlisted_host_skipped(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="api.example.com", library="requests"),
-        ))
+        facts = ScriptFacts(network_calls=(NetworkFact(target="api.example.com", library="requests"), ))
         out = check_network_non_allowlist(
             facts,
             _policy(network={"allow_domains": ["api.example.com"]}),
@@ -264,41 +229,31 @@ class TestNetworkAllowlist:
 
     def test_dynamic_network_skipped_by_this_rule(self):
         # dynamic=True goes to NET002 rule
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="", library="requests", dynamic=True),
-        ))
-        out = check_network_non_allowlist(facts, _policy(),
-                                          ScriptLanguage.PYTHON,
-                                          _redactor())
+        facts = ScriptFacts(network_calls=(NetworkFact(target="", library="requests", dynamic=True), ))
+        out = check_network_non_allowlist(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
 
 class TestIpLiterals:
+
     def test_ip_literal_blocked(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="8.8.8.8", library="requests"),
-        ))
-        out = check_network_ip_literals(facts, _policy(),
-                                        ScriptLanguage.PYTHON,
-                                        _redactor())
+        facts = ScriptFacts(network_calls=(NetworkFact(target="8.8.8.8", library="requests"), ))
+        out = check_network_ip_literals(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"NET003_IP_LITERAL"}
 
     def test_hostname_not_blocked(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="api.example.com", library="requests"),
-        ))
-        out = check_network_ip_literals(facts, _policy(),
-                                        ScriptLanguage.PYTHON,
-                                        _redactor())
+        facts = ScriptFacts(network_calls=(NetworkFact(target="api.example.com", library="requests"), ))
+        out = check_network_ip_literals(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_disable_ip_block(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="8.8.8.8", library="requests"),
-        ))
+        facts = ScriptFacts(network_calls=(NetworkFact(target="8.8.8.8", library="requests"), ))
         out = check_network_ip_literals(
             facts,
-            _policy(network={"allow_domains": [], "deny_ip_literals": False}),
+            _policy(network={
+                "allow_domains": [],
+                "deny_ip_literals": False
+            }),
             ScriptLanguage.PYTHON,
             _redactor(),
         )
@@ -306,28 +261,19 @@ class TestIpLiterals:
 
 
 class TestDynamicNetworkTarget:
+
     def test_dynamic_target_review(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="", library="requests", dynamic=True),
-        ))
-        out = check_network_dynamic_target(facts, _policy(),
-                                           ScriptLanguage.PYTHON,
-                                           _redactor())
+        facts = ScriptFacts(network_calls=(NetworkFact(target="", library="requests", dynamic=True), ))
+        out = check_network_dynamic_target(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"NET002_DYNAMIC_TARGET"}
 
     def test_static_target_skipped(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="api.example.com", library="requests"),
-        ))
-        out = check_network_dynamic_target(facts, _policy(),
-                                           ScriptLanguage.PYTHON,
-                                           _redactor())
+        facts = ScriptFacts(network_calls=(NetworkFact(target="api.example.com", library="requests"), ))
+        out = check_network_dynamic_target(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_default_allow_skips_finding(self):
-        facts = ScriptFacts(network_calls=(
-            NetworkFact(target="", library="requests", dynamic=True),
-        ))
+        facts = ScriptFacts(network_calls=(NetworkFact(target="", library="requests", dynamic=True), ))
         out = check_network_dynamic_target(
             facts,
             _policy(defaults={"unknown_construct": "allow"}),
@@ -338,61 +284,48 @@ class TestDynamicNetworkTarget:
 
 
 class TestProcessExec:
+
     def test_deny_list_executable(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="rm"),
-        ))
+        facts = ScriptFacts(process_calls=(ProcessFact(command="rm"), ))
         out = check_process_exec(
             facts,
-            _policy(commands={"allow": [], "deny": ["rm"]}),
+            _policy(commands={
+                "allow": [],
+                "deny": ["rm"]
+            }),
             ScriptLanguage.BASH,
             _redactor(),
         )
         assert _ids(out) == {"PROC001_PROCESS_EXEC"}
 
     def test_shell_true_routed_to_proc002(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="ls", shell=True),
-        ))
-        out = check_process_exec(facts, _policy(),
-                                  ScriptLanguage.PYTHON,
-                                  _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command="ls", shell=True), ))
+        out = check_process_exec(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert "PROC001_PROCESS_EXEC" not in _ids(out)
 
     def test_operators_routed_to_proc003(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="ls | grep", has_operators=True),
-        ))
-        out = check_process_exec(facts, _policy(),
-                                  ScriptLanguage.BASH,
-                                  _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command="ls | grep", has_operators=True), ))
+        out = check_process_exec(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert "PROC001_PROCESS_EXEC" not in _ids(out)
 
     def test_empty_executable_review(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command=""),
-        ))
-        out = check_process_exec(facts, _policy(),
-                                  ScriptLanguage.PYTHON,
-                                  _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command=""), ))
+        out = check_process_exec(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"PROC001_PROCESS_EXEC"}
 
     def test_safe_bash_command_skipped(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="ls"),
-        ))
-        out = check_process_exec(facts, _policy(),
-                                  ScriptLanguage.BASH,
-                                  _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command="ls"), ))
+        out = check_process_exec(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert out == []
 
     def test_allow_list_unrecognized_review(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="customexec"),
-        ))
+        facts = ScriptFacts(process_calls=(ProcessFact(command="customexec"), ))
         out = check_process_exec(
             facts,
-            _policy(commands={"allow": ["ls"], "deny": []}),
+            _policy(commands={
+                "allow": ["ls"],
+                "deny": []
+            }),
             ScriptLanguage.BASH,
             _redactor(),
         )
@@ -400,40 +333,28 @@ class TestProcessExec:
 
 
 class TestShellInjection:
+
     def test_shell_true_emits_critical(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="ls", shell=True),
-        ))
-        out = check_shell_injection(facts, _policy(),
-                                    ScriptLanguage.PYTHON,
-                                    _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command="ls", shell=True), ))
+        out = check_shell_injection(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"PROC002_SHELL_INJECTION"}
         assert out[0].risk_level == RiskLevel.CRITICAL
 
     def test_no_shell_no_finding(self):
-        facts = ScriptFacts(process_calls=(
-            ProcessFact(command="ls", shell=False),
-        ))
-        out = check_shell_injection(facts, _policy(),
-                                    ScriptLanguage.PYTHON,
-                                    _redactor())
+        facts = ScriptFacts(process_calls=(ProcessFact(command="ls", shell=False), ))
+        out = check_shell_injection(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
 
 class TestShellOperator:
+
     def test_operator_review(self):
-        facts = ScriptFacts(shell_operators=(
-            ShellOperatorFact(operator="|"),
-        ))
-        out = check_shell_operator(facts, _policy(),
-                                   ScriptLanguage.BASH,
-                                   _redactor())
+        facts = ScriptFacts(shell_operators=(ShellOperatorFact(operator="|"), ))
+        out = check_shell_operator(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert _ids(out) == {"PROC003_SHELL_OPERATOR"}
 
     def test_default_allow_skips(self):
-        facts = ScriptFacts(shell_operators=(
-            ShellOperatorFact(operator="|"),
-        ))
+        facts = ScriptFacts(shell_operators=(ShellOperatorFact(operator="|"), ))
         out = check_shell_operator(
             facts,
             _policy(defaults={"unknown_construct": "allow"}),
@@ -444,31 +365,23 @@ class TestShellOperator:
 
 
 class TestPrivilege:
+
     def test_sudo_denied(self):
-        facts = ScriptFacts(privilege_commands=(
-            PrivilegeFact(command="sudo"),
-        ))
-        out = check_privilege_escalation(facts, _policy(),
-                                         ScriptLanguage.BASH,
-                                         _redactor())
+        facts = ScriptFacts(privilege_commands=(PrivilegeFact(command="sudo"), ))
+        out = check_privilege_escalation(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert _ids(out) == {"PROC004_PRIVILEGE"}
         assert out[0].risk_level == RiskLevel.CRITICAL
 
 
 class TestDependencyInstall:
+
     def test_default_deny(self):
-        facts = ScriptFacts(dependency_installs=(
-            DependencyInstallFact(manager="pip", command="pip install x"),
-        ))
-        out = check_dependency_install(facts, _policy(),
-                                       ScriptLanguage.BASH,
-                                       _redactor())
+        facts = ScriptFacts(dependency_installs=(DependencyInstallFact(manager="pip", command="pip install x"), ))
+        out = check_dependency_install(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert _ids(out) == {"DEP001_ENV_MUTATION"}
 
     def test_allow_skips(self):
-        facts = ScriptFacts(dependency_installs=(
-            DependencyInstallFact(manager="pip", command="pip install x"),
-        ))
+        facts = ScriptFacts(dependency_installs=(DependencyInstallFact(manager="pip", command="pip install x"), ))
         out = check_dependency_install(
             facts,
             _policy(dependencies={"decision": "allow"}),
@@ -478,9 +391,7 @@ class TestDependencyInstall:
         assert out == []
 
     def test_review_path(self):
-        facts = ScriptFacts(dependency_installs=(
-            DependencyInstallFact(manager="pip", command="pip install x"),
-        ))
+        facts = ScriptFacts(dependency_installs=(DependencyInstallFact(manager="pip", command="pip install x"), ))
         out = check_dependency_install(
             facts,
             _policy(dependencies={"decision": "needs_human_review"}),
@@ -493,165 +404,108 @@ class TestDependencyInstall:
 
 
 class TestUnboundedLoop:
+
     def test_loop_denied(self):
-        facts = ScriptFacts(unbounded_loops=(
-            UnboundedLoopFact(kind="while-True"),
-        ))
-        out = check_unbounded_loop(facts, _policy(),
-                                   ScriptLanguage.PYTHON,
-                                   _redactor())
+        facts = ScriptFacts(unbounded_loops=(UnboundedLoopFact(kind="while-True"), ))
+        out = check_unbounded_loop(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES001_UNBOUNDED_LOOP"}
 
 
 class TestForkBomb:
+
     def test_bomb_denied(self):
-        facts = ScriptFacts(fork_bombs=(
-            ForkBombFact(pattern="classic"),
-        ))
-        out = check_fork_bomb(facts, _policy(),
-                               ScriptLanguage.BASH,
-                               _redactor())
+        facts = ScriptFacts(fork_bombs=(ForkBombFact(pattern="classic"), ))
+        out = check_fork_bomb(facts, _policy(), ScriptLanguage.BASH, _redactor())
         assert _ids(out) == {"RES002_FORK_BOMB"}
         assert out[0].risk_level == RiskLevel.CRITICAL
 
 
 class TestLongSleep:
+
     def test_static_within_limit_skipped(self):
-        facts = ScriptFacts(long_sleeps=(
-            LongSleepFact(duration_seconds=5.0, raw="5"),
-        ))
-        out = check_long_sleep(facts, _policy(),
-                               ScriptLanguage.PYTHON,
-                               _redactor())
+        facts = ScriptFacts(long_sleeps=(LongSleepFact(duration_seconds=5.0, raw="5"), ))
+        out = check_long_sleep(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_static_over_limit_denied(self):
-        facts = ScriptFacts(long_sleeps=(
-            LongSleepFact(duration_seconds=120.0, raw="120"),
-        ))
-        out = check_long_sleep(facts, _policy(),
-                               ScriptLanguage.PYTHON,
-                               _redactor())
+        facts = ScriptFacts(long_sleeps=(LongSleepFact(duration_seconds=120.0, raw="120"), ))
+        out = check_long_sleep(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES003_LONG_SLEEP"}
         assert out[0].decision == SafetyDecision.DENY
 
     def test_dynamic_duration_review(self):
-        facts = ScriptFacts(long_sleeps=(
-            LongSleepFact(duration_seconds=None, raw="some_var"),
-        ))
-        out = check_long_sleep(facts, _policy(),
-                               ScriptLanguage.PYTHON,
-                               _redactor())
+        facts = ScriptFacts(long_sleeps=(LongSleepFact(duration_seconds=None, raw="some_var"), ))
+        out = check_long_sleep(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES003_LONG_SLEEP"}
         assert out[0].risk_level == RiskLevel.LOW
 
 
 class TestConcurrency:
+
     def test_within_limit_skipped(self):
-        facts = ScriptFacts(concurrency=(
-            ConcurrencyFact(count=2, raw="threading.Thread"),
-        ))
-        out = check_concurrency(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(concurrency=(ConcurrencyFact(count=2, raw="threading.Thread"), ))
+        out = check_concurrency(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_over_limit_denied(self):
-        facts = ScriptFacts(concurrency=(
-            ConcurrencyFact(count=100, raw="threading.Thread"),
-        ))
-        out = check_concurrency(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(concurrency=(ConcurrencyFact(count=100, raw="threading.Thread"), ))
+        out = check_concurrency(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES004_CONCURRENCY"}
 
     def test_dynamic_count_review(self):
-        facts = ScriptFacts(concurrency=(
-            ConcurrencyFact(count=None, raw="threading.Thread"),
-        ))
-        out = check_concurrency(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(concurrency=(ConcurrencyFact(count=None, raw="threading.Thread"), ))
+        out = check_concurrency(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES004_CONCURRENCY"}
 
 
 class TestLargeWrite:
+
     def test_within_budget(self):
-        facts = ScriptFacts(large_writes=(
-            LargeWriteFact(size=100, target="/tmp/x", raw="open"),
-        ))
-        out = check_large_write(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(large_writes=(LargeWriteFact(size=100, target="/tmp/x", raw="open"), ))
+        out = check_large_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_over_budget(self):
         # Default max_file_write_bytes is 10_485_760; use a larger size
         # so the threshold check fires.
-        facts = ScriptFacts(large_writes=(
-            LargeWriteFact(size=20_000_000, target="/tmp/x", raw="open"),
-        ))
-        out = check_large_write(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(large_writes=(LargeWriteFact(size=20_000_000, target="/tmp/x", raw="open"), ))
+        out = check_large_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES005_LARGE_WRITE"}
 
     def test_dynamic_size_review(self):
-        facts = ScriptFacts(large_writes=(
-            LargeWriteFact(size=None, target="/tmp/x", raw="open"),
-        ))
-        out = check_large_write(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(large_writes=(LargeWriteFact(size=None, target="/tmp/x", raw="open"), ))
+        out = check_large_write(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"RES005_LARGE_WRITE"}
 
 
 class TestSecretFlows:
+
     def test_output_sink(self):
-        facts = ScriptFacts(secret_flows=(
-            SecretFlowFact(source="tainted", sink="print",
-                           sink_kind="output"),
-        ))
-        out = check_secret_to_output(facts, _policy(),
-                                     ScriptLanguage.PYTHON,
-                                     _redactor())
+        facts = ScriptFacts(secret_flows=(SecretFlowFact(source="tainted", sink="print", sink_kind="output"), ))
+        out = check_secret_to_output(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"SECRET001_LOG_SINK"}
 
     def test_file_sink(self):
-        facts = ScriptFacts(secret_flows=(
-            SecretFlowFact(source="tainted", sink="open",
-                           sink_kind="file"),
-        ))
-        out = check_secret_to_file(facts, _policy(),
-                                   ScriptLanguage.PYTHON,
-                                   _redactor())
+        facts = ScriptFacts(secret_flows=(SecretFlowFact(source="tainted", sink="open", sink_kind="file"), ))
+        out = check_secret_to_file(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"SECRET002_FILE_SINK"}
 
     def test_network_sink(self):
-        facts = ScriptFacts(secret_flows=(
-            SecretFlowFact(source="tainted", sink="requests.post",
-                           sink_kind="network"),
-        ))
-        out = check_secret_to_network(facts, _policy(),
-                                      ScriptLanguage.PYTHON,
-                                      _redactor())
+        facts = ScriptFacts(
+            secret_flows=(SecretFlowFact(source="tainted", sink="requests.post", sink_kind="network"), ))
+        out = check_secret_to_network(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"SECRET003_NETWORK_SINK"}
 
 
 class TestParseError:
+
     def test_parse_error_default_review(self):
-        facts = ScriptFacts(parse_errors=(
-            ParseErrorFact(message="boom"),
-        ))
-        out = check_parse_error(facts, _policy(),
-                                ScriptLanguage.PYTHON,
-                                _redactor())
+        facts = ScriptFacts(parse_errors=(ParseErrorFact(message="boom"), ))
+        out = check_parse_error(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"PARSE001_UNCERTAIN"}
 
     def test_default_allow_skips(self):
-        facts = ScriptFacts(parse_errors=(
-            ParseErrorFact(message="boom"),
-        ))
+        facts = ScriptFacts(parse_errors=(ParseErrorFact(message="boom"), ))
         out = check_parse_error(
             facts,
             _policy(defaults={"unknown_construct": "allow"}),
@@ -662,19 +516,14 @@ class TestParseError:
 
 
 class TestDynamicExec:
+
     def test_exec_review(self):
-        facts = ScriptFacts(dynamic_execs=(
-            DynamicExecFact(kind="eval"),
-        ))
-        out = check_dynamic_exec(facts, _policy(),
-                                 ScriptLanguage.PYTHON,
-                                 _redactor())
+        facts = ScriptFacts(dynamic_execs=(DynamicExecFact(kind="eval"), ))
+        out = check_dynamic_exec(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert _ids(out) == {"OBF001_DYNAMIC_EXEC"}
 
     def test_allow_skips(self):
-        facts = ScriptFacts(dynamic_execs=(
-            DynamicExecFact(kind="eval"),
-        ))
+        facts = ScriptFacts(dynamic_execs=(DynamicExecFact(kind="eval"), ))
         out = check_dynamic_exec(
             facts,
             _policy(defaults={"unknown_construct": "allow"}),
@@ -685,22 +534,22 @@ class TestDynamicExec:
 
 
 class TestEvaluateFacts:
+
     def test_no_facts_no_findings(self):
-        out = evaluate_facts(ScriptFacts(), _policy(),
-                             ScriptLanguage.PYTHON, _redactor())
+        out = evaluate_facts(ScriptFacts(), _policy(), ScriptLanguage.PYTHON, _redactor())
         assert out == []
 
     def test_aggregates_multiple(self):
         facts = ScriptFacts(
-            unbounded_loops=(UnboundedLoopFact(kind="x"),),
-            fork_bombs=(ForkBombFact(pattern="x"),),
+            unbounded_loops=(UnboundedLoopFact(kind="x"), ),
+            fork_bombs=(ForkBombFact(pattern="x"), ),
         )
-        out = evaluate_facts(facts, _policy(),
-                             ScriptLanguage.PYTHON, _redactor())
+        out = evaluate_facts(facts, _policy(), ScriptLanguage.PYTHON, _redactor())
         assert {"RES001_UNBOUNDED_LOOP", "RES002_FORK_BOMB"} <= _ids(out)
 
 
 class TestHelperFunctions:
+
     def test_first_token_simple(self):
         assert _first_token("ls -l") == "ls"
 
@@ -758,6 +607,7 @@ class TestHelperFunctions:
 
 
 class TestDefaultRulesAndCatalog:
+
     def test_default_rules_count(self):
         rules = default_rules()
         assert len(rules) == 3

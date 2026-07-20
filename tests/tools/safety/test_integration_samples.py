@@ -26,49 +26,25 @@ from trpc_agent_sdk.tools.safety._models import (
 )
 from trpc_agent_sdk.tools.safety._policy import load_safety_policy_dict
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SAMPLES_DIR = (REPO_ROOT
-               / "trpc_agent_sdk" / "tools" / "safety" / "examples"
-               / "samples")
-MANIFEST_PATH = (REPO_ROOT
-                 / "trpc_agent_sdk" / "tools" / "safety" / "examples"
-                 / "manifest_run.json")
-
+SAMPLES_DIR = (REPO_ROOT / "trpc_agent_sdk" / "tools" / "safety" / "examples" / "samples")
+MANIFEST_PATH = (REPO_ROOT / "trpc_agent_sdk" / "tools" / "safety" / "examples" / "manifest_run.json")
 
 # Map sample file names to (language, expected_decision, expected_rule_ids)
 # extracted from the manifest. This lets the parametrized test verify both
 # the decision and the primary rule without depending on absolute hashes.
 SAMPLE_EXPECTATIONS = {
-    "01_safe_python.py": (ScriptLanguage.PYTHON,
-                          SafetyDecision.ALLOW, ("SAFE000",)),
-    "03_dangerous_delete.py": (ScriptLanguage.PYTHON,
-                                SafetyDecision.DENY,
-                                ("FILE001_RECURSIVE_DELETE",)),
-    "04_read_ssh_key.py": (ScriptLanguage.PYTHON,
-                            SafetyDecision.DENY,
-                            ("FILE003_CREDENTIAL_READ",)),
-    "05_non_whitelist_network.py": (ScriptLanguage.PYTHON,
-                                     SafetyDecision.DENY,
-                                     ("NET001_DOMAIN_NOT_ALLOWED",)),
-    "06_whitelist_network.py": (ScriptLanguage.PYTHON,
-                                 SafetyDecision.ALLOW,
-                                 ("SAFE000",)),
-    "07_allowed_subprocess.py": (ScriptLanguage.PYTHON,
-                                  SafetyDecision.ALLOW,
-                                  ("SAFE000",)),
-    "08_shell_injection.py": (ScriptLanguage.PYTHON,
-                               SafetyDecision.DENY,
-                               ("PROC002_SHELL_INJECTION",)),
-    "10_infinite_loop.py": (ScriptLanguage.PYTHON,
-                             SafetyDecision.DENY,
-                             ("RES001_UNBOUNDED_LOOP",)),
-    "11_sensitive_output.py": (ScriptLanguage.PYTHON,
-                                SafetyDecision.DENY,
-                                ("SECRET001_LOG_SINK",)),
-    "14_dynamic_command_review.py": (ScriptLanguage.PYTHON,
-                                      SafetyDecision.NEEDS_HUMAN_REVIEW,
-                                      ("PROC001_PROCESS_EXEC",)),
+    "01_safe_python.py": (ScriptLanguage.PYTHON, SafetyDecision.ALLOW, ("SAFE000", )),
+    "03_dangerous_delete.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("FILE001_RECURSIVE_DELETE", )),
+    "04_read_ssh_key.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("FILE003_CREDENTIAL_READ", )),
+    "05_non_whitelist_network.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("NET001_DOMAIN_NOT_ALLOWED", )),
+    "06_whitelist_network.py": (ScriptLanguage.PYTHON, SafetyDecision.ALLOW, ("SAFE000", )),
+    "07_allowed_subprocess.py": (ScriptLanguage.PYTHON, SafetyDecision.ALLOW, ("SAFE000", )),
+    "08_shell_injection.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("PROC002_SHELL_INJECTION", )),
+    "10_infinite_loop.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("RES001_UNBOUNDED_LOOP", )),
+    "11_sensitive_output.py": (ScriptLanguage.PYTHON, SafetyDecision.DENY, ("SECRET001_LOG_SINK", )),
+    "14_dynamic_command_review.py":
+    (ScriptLanguage.PYTHON, SafetyDecision.NEEDS_HUMAN_REVIEW, ("PROC001_PROCESS_EXEC", )),
 }
 
 
@@ -83,9 +59,16 @@ def policy():
 
     return load_safety_policy_dict({
         "version": "1",
-        "network": {"allow_domains": ["api.github.com"]},
-        "commands": {"allow": ["python"], "deny": []},
-        "paths": {"deny": ["/etc/**", "~/.ssh/**", "/root/**"]},
+        "network": {
+            "allow_domains": ["api.github.com"]
+        },
+        "commands": {
+            "allow": ["python"],
+            "deny": []
+        },
+        "paths": {
+            "deny": ["/etc/**", "~/.ssh/**", "/root/**"]
+        },
         "limits": {
             "max_timeout_seconds": 60.0,
             "max_output_bytes": 1048576,
@@ -100,8 +83,13 @@ def policy():
             "guard_error": "deny",
             "human_review_blocks_execution": True,
         },
-        "dependencies": {"decision": "deny"},
-        "audit": {"enabled": False, "required": False},
+        "dependencies": {
+            "decision": "deny"
+        },
+        "audit": {
+            "enabled": False,
+            "required": False
+        },
     })
 
 
@@ -111,12 +99,8 @@ def guard(policy):
 
 
 @pytest.mark.parametrize("filename,language,expected_decision,expected_rules",
-                         [
-                             (name, ) + expectations
-                             for name, expectations in SAMPLE_EXPECTATIONS.items()
-                         ])
-def test_sample_expectations(guard, sample_script, filename, language,
-                              expected_decision, expected_rules):
+                         [(name, ) + expectations for name, expectations in SAMPLE_EXPECTATIONS.items()])
+def test_sample_expectations(guard, sample_script, filename, language, expected_decision, expected_rules):
     """Each sample must produce the decision and rules declared above."""
 
     if not (SAMPLES_DIR / filename).exists():
@@ -129,19 +113,14 @@ def test_sample_expectations(guard, sample_script, filename, language,
         script=script,
     )
     report = guard.scan(request)
-    assert report.decision == expected_decision, (
-        f"{filename}: expected {expected_decision.value}, "
-        f"got {report.decision.value}; rule_ids={report.rule_ids}"
-    )
+    assert report.decision == expected_decision, (f"{filename}: expected {expected_decision.value}, "
+                                                  f"got {report.decision.value}; rule_ids={report.rule_ids}")
     for rule in expected_rules:
-        assert rule in report.rule_ids, (
-            f"{filename}: expected rule {rule} in {report.rule_ids}")
+        assert rule in report.rule_ids, (f"{filename}: expected rule {rule} in {report.rule_ids}")
 
 
-@pytest.mark.parametrize("filename,language", [
-    (name, expectations[0])
-    for name, expectations in SAMPLE_EXPECTATIONS.items()
-])
+@pytest.mark.parametrize("filename,language",
+                         [(name, expectations[0]) for name, expectations in SAMPLE_EXPECTATIONS.items()])
 def test_sample_report_serializes(guard, sample_script, filename, language):
     """Every sample must produce a JSON-serializable report."""
 

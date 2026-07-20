@@ -18,6 +18,7 @@ from trpc_agent_sdk.tools.safety._redaction import (
 
 
 class TestRedactorBasics:
+
     def test_empty_text_passthrough(self):
         r = Redactor()
         assert r.redact("") == ""
@@ -50,6 +51,7 @@ class TestRedactorBasics:
 
 
 class TestSecretPatterns:
+
     def test_sk_api_key(self):
         r = Redactor()
         out = r.redact("key=sk-" + "a" * 20)
@@ -84,11 +86,9 @@ class TestSecretPatterns:
 
     def test_private_key_block(self):
         r = Redactor()
-        body = (
-            "-----BEGIN RSA PRIVATE KEY-----\n"
-            "MIIBOgIBAAJBAKjQ4Z\n"
-            "-----END RSA PRIVATE KEY-----"
-        )
+        body = ("-----BEGIN RSA PRIVATE KEY-----\n"
+                "MIIBOgIBAAJBAKjQ4Z\n"
+                "-----END RSA PRIVATE KEY-----")
         out = r.redact(body)
         assert "<REDACTED:private_key_block:" in out
 
@@ -99,6 +99,7 @@ class TestSecretPatterns:
 
 
 class TestTruncate:
+
     def test_short_text_unchanged(self):
         r = Redactor()
         assert r.truncate("short") == "short"
@@ -120,6 +121,7 @@ class TestTruncate:
 
 
 class TestBuildEvidence:
+
     def test_redacts_snippet(self):
         r = Redactor()
         ev = r.build_evidence(snippet="password=hunter2likevalue")
@@ -146,6 +148,7 @@ class TestBuildEvidence:
 
 
 class TestContainsSecretLiteral:
+
     def test_positive(self):
         assert contains_secret_literal("sk-" + "a" * 20) is True
         assert contains_secret_literal("Bearer token12345678") is True
@@ -155,13 +158,13 @@ class TestContainsSecretLiteral:
 
 
 class TestEvidenceWasRedacted:
+
     def test_redacted_snippet(self):
         ev = Evidence(snippet="<REDACTED:jwt:abcd>")
         assert evidence_was_redacted(ev) is True
 
     def test_redacted_extra(self):
-        ev = Evidence(snippet="ok",
-                      extras={"x": "<REDACTED:env:abc>"})
+        ev = Evidence(snippet="ok", extras={"x": "<REDACTED:env:abc>"})
         assert evidence_was_redacted(ev) is True
 
     def test_no_redaction(self):

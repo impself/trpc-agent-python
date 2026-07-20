@@ -15,10 +15,10 @@ from trpc_agent_sdk.tools.safety._exceptions import (
 
 def test_all_errors_subclass_guard_error():
     for cls in (
-        SafetyPolicyError,
-        SafetyScannerError,
-        SafetyAuditError,
-        ToolRequestError,
+            SafetyPolicyError,
+            SafetyScannerError,
+            SafetyAuditError,
+            ToolRequestError,
     ):
         assert issubclass(cls, SafetyGuardError)
 

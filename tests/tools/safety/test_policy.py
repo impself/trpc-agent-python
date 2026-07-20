@@ -31,6 +31,7 @@ from trpc_agent_sdk.tools.safety._policy import (
 
 
 class TestNetworkPolicy:
+
     def test_defaults(self):
         net = NetworkPolicy()
         assert net.allow_domains == ()
@@ -38,11 +39,11 @@ class TestNetworkPolicy:
 
     def test_normalize_lowercases(self):
         net = NetworkPolicy(allow_domains=["API.Example.COM"])
-        assert net.allow_domains == ("api.example.com",)
+        assert net.allow_domains == ("api.example.com", )
 
     def test_strips_trailing_dot(self):
         net = NetworkPolicy(allow_domains=["api.example.com."])
-        assert net.allow_domains == ("api.example.com",)
+        assert net.allow_domains == ("api.example.com", )
 
     def test_none_returns_empty_tuple(self):
         net = NetworkPolicy(allow_domains=None)
@@ -58,7 +59,7 @@ class TestNetworkPolicy:
 
     def test_wildcard_prefix_ok(self):
         net = NetworkPolicy(allow_domains=["*.example.com"])
-        assert net.allow_domains == ("*.example.com",)
+        assert net.allow_domains == ("*.example.com", )
 
     def test_empty_entries_rejected(self):
         with pytest.raises(SafetyPolicyError):
@@ -70,6 +71,7 @@ class TestNetworkPolicy:
 
 
 class TestCommandsPolicy:
+
     def test_defaults(self):
         cmds = CommandsPolicy()
         assert cmds.allow == ()
@@ -77,8 +79,8 @@ class TestCommandsPolicy:
 
     def test_normalize_lowercases(self):
         cmds = CommandsPolicy(allow=["LS"], deny=["RM"])
-        assert cmds.allow == ("ls",)
-        assert cmds.deny == ("rm",)
+        assert cmds.allow == ("ls", )
+        assert cmds.deny == ("rm", )
 
     def test_string_rejected(self):
         with pytest.raises(SafetyPolicyError):
@@ -86,6 +88,7 @@ class TestCommandsPolicy:
 
 
 class TestPathsPolicy:
+
     def test_defaults(self):
         p = PathsPolicy()
         assert p.deny == ()
@@ -100,6 +103,7 @@ class TestPathsPolicy:
 
 
 class TestLimitsPolicy:
+
     def test_defaults(self):
         lim = LimitsPolicy()
         assert lim.max_timeout_seconds == 60.0
@@ -120,6 +124,7 @@ class TestLimitsPolicy:
 
 
 class TestDefaultsPolicy:
+
     def test_defaults(self):
         d = DefaultsPolicy()
         assert d.unknown_construct == "needs_human_review"
@@ -136,11 +141,13 @@ class TestDefaultsPolicy:
 
 
 class TestDependenciesPolicy:
+
     def test_default_is_deny(self):
         assert DependenciesPolicy().decision == "deny"
 
 
 class TestToolFieldMapping:
+
     def test_defaults(self):
         m = ToolFieldMapping()
         assert m.execution_capable is False
@@ -148,6 +155,7 @@ class TestToolFieldMapping:
 
 
 class TestToolSafetyPolicy:
+
     def test_default_construct(self):
         p = ToolSafetyPolicy()
         assert p.version == POLICY_VERSION
@@ -159,8 +167,7 @@ class TestToolSafetyPolicy:
             ToolSafetyPolicy(version="99")
 
     def test_rule_overrides_valid(self):
-        p = ToolSafetyPolicy(rule_overrides={"FILE001_RECURSIVE_DELETE":
-                                              "allow"})
+        p = ToolSafetyPolicy(rule_overrides={"FILE001_RECURSIVE_DELETE": "allow"})
         assert p.rule_overrides["FILE001_RECURSIVE_DELETE"] == "allow"
 
     def test_rule_overrides_invalid(self):
@@ -174,8 +181,7 @@ class TestToolSafetyPolicy:
 
     def test_hash_changes_with_content(self):
         a = ToolSafetyPolicy()
-        b = ToolSafetyPolicy(
-            network=NetworkPolicy(allow_domains=["api.example.com"]))
+        b = ToolSafetyPolicy(network=NetworkPolicy(allow_domains=["api.example.com"]))
         assert a.hash != b.hash
 
     def test_sensitive_env_key_patterns_default(self):
@@ -188,6 +194,7 @@ class TestToolSafetyPolicy:
 
 
 class TestLoadSafetyPolicyDict:
+
     def test_minimal_dict(self):
         p = load_safety_policy_dict({"version": POLICY_VERSION})
         assert isinstance(p, ToolSafetyPolicy)
@@ -202,6 +209,7 @@ class TestLoadSafetyPolicyDict:
 
 
 class TestLoadSafetyPolicyFile:
+
     def test_missing_file(self, tmp_path):
         with pytest.raises(SafetyPolicyError):
             load_safety_policy(tmp_path / "nope.yaml")
@@ -253,6 +261,7 @@ class TestLoadSafetyPolicyFile:
 
 
 class TestPathGlobMatching:
+
     def test_normalize_empty(self):
         assert _normalize_path_glob("") == ""
 
@@ -314,6 +323,7 @@ class TestPathGlobMatching:
 
 
 class TestMatchDomain:
+
     def test_exact_match(self):
         assert match_domain("api.example.com", ["api.example.com"]) is True
 
@@ -321,8 +331,7 @@ class TestMatchDomain:
         assert match_domain("API.Example.COM", ["api.example.com"]) is True
 
     def test_trailing_dot_stripped(self):
-        assert match_domain("api.example.com.",
-                            ["api.example.com"]) is True
+        assert match_domain("api.example.com.", ["api.example.com"]) is True
 
     def test_wildcard_one_level(self):
         assert match_domain("api.example.com", ["*.example.com"]) is True
@@ -338,9 +347,9 @@ class TestMatchDomain:
 
 
 class TestSensitiveEnvKey:
+
     def test_default_patterns_match(self):
-        patterns = ("*KEY*", "*TOKEN*", "*PASSWORD*",
-                    "*SECRET*", "*CREDENTIAL*")
+        patterns = ("*KEY*", "*TOKEN*", "*PASSWORD*", "*SECRET*", "*CREDENTIAL*")
         assert is_sensitive_env_key("API_KEY", patterns) is True
         assert is_sensitive_env_key("AUTH_TOKEN", patterns) is True
         assert is_sensitive_env_key("DB_PASSWORD", patterns) is True
@@ -348,8 +357,7 @@ class TestSensitiveEnvKey:
         assert is_sensitive_env_key("AWS_CREDENTIAL", patterns) is True
 
     def test_non_sensitive(self):
-        assert is_sensitive_env_key("PATH",
-                                    ("*KEY*", "*TOKEN*")) is False
+        assert is_sensitive_env_key("PATH", ("*KEY*", "*TOKEN*")) is False
 
     def test_empty(self):
-        assert is_sensitive_env_key("", ("*KEY*",)) is False
+        assert is_sensitive_env_key("", ("*KEY*", )) is False

@@ -31,12 +31,16 @@ SAMPLES_DIR = Path(__file__).resolve().parents[3] \
 def _policy_dict(**overrides: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "version": POLICY_VERSION,
-        "network": {"allow_domains": ["api.example.com", "*.example.com"]},
+        "network": {
+            "allow_domains": ["api.example.com", "*.example.com"]
+        },
         "commands": {
             "allow": ["python", "ls"],
             "deny": ["rm"],
         },
-        "paths": {"deny": ["/etc/**", "~/.ssh/**", "/root/**"]},
+        "paths": {
+            "deny": ["/etc/**", "~/.ssh/**", "/root/**"]
+        },
         "limits": {
             "max_timeout_seconds": 60.0,
             "max_output_bytes": 1024,
@@ -51,8 +55,13 @@ def _policy_dict(**overrides: Any) -> dict[str, Any]:
             "guard_error": "deny",
             "human_review_blocks_execution": True,
         },
-        "dependencies": {"decision": "deny"},
-        "audit": {"enabled": False, "required": False},
+        "dependencies": {
+            "decision": "deny"
+        },
+        "audit": {
+            "enabled": False,
+            "required": False
+        },
     }
     for key, value in overrides.items():
         data[key] = value
